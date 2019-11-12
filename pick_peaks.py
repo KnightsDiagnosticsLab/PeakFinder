@@ -57,8 +57,10 @@ def organize_files(path):
 			]
 
 	# construct case list
-	csv_list = [f for f in os.listdir(path) if f.endswith('.csv')]
-	case_names = set(re.findall(r'\d\dKD-\d\d\dM\d\d\d\d', ''.join(csv_list)))	# set of unique case numbers
+	csv_list = [f for f in os.listdir(path) if f.endswith('.fsa')]
+	case_names_as_llt = [re.findall(r'(\d\dKD-\d\d\dM\d\d\d\d)(-R)*', x) for x in csv_list]	# 'llt' is 'list of lists of tuple'
+	case_names_as_ll = [list(lt[0]) for lt in case_names_as_llt if len(lt) > 0]	# ll is 'list of lists'
+	case_names = {''.join(x) for x in case_names_as_ll}	# finally we have a set of unique strings
 
 	# make a dictionary of case names to case files
 	cd = {cn : { t : [f for f in csv_list if cn in f and t in f] for t in tests } for cn in case_names}
@@ -247,6 +249,7 @@ def replace_height_with_prominence(cases):
 	return cases
 
 def main():
+	owd = os.getcwd()	# original working directory
 	path = os.path.abspath(sys.argv[1])
 	os.chdir(path)
 	cases = organize_files(path)
@@ -256,9 +259,9 @@ def main():
 	cases = make_decay_curve(cases)
 	cases = local_southern(cases)
 
-	if not os.path.exists(os.getcwd() + '/plots'):
-		os.mkdir(os.getcwd() +'/plots')
-	os.chdir(os.getcwd() + '/plots')
+	if not os.path.exists(owd + '/plots'):
+		os.mkdir(owd +'/plots')
+	os.chdir(owd + '/plots')
 
 	plot_cases(cases)
 
