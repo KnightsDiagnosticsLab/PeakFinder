@@ -57,7 +57,7 @@ def organize_files(path):
 			]
 
 	# construct case list
-	csv_list = [f for f in os.listdir(path) if f.endswith('.fsa')]
+	csv_list = [f for f in os.listdir(path) if f.endswith('.csv')]
 	case_names_as_llt = [re.findall(r'(\d\dKD-\d\d\dM\d\d\d\d)(-R)*', x) for x in csv_list]	# 'llt' is 'list of lists of tuple'
 	case_names_as_ll = [list(lt[0]) for lt in case_names_as_llt if len(lt) > 0]	# ll is 'list of lists'
 	case_names = {''.join(x) for x in case_names_as_ll}	# finally we have a set of unique strings
