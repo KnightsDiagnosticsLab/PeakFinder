@@ -58,7 +58,8 @@ def organize_files(path):
 
 	# construct case list
 	csv_list = [f for f in os.listdir(path) if f.endswith('.csv')]
-	case_names_as_llt = [re.findall(r'(\d\dKD-\d\d\dM\d\d\d\d)(-R)*', x) for x in csv_list]	# 'llt' is 'list of lists of tuple'
+	# case_names_as_llt = [re.findall(r'(\d\dKD-\d\d\dM\d\d\d\d)(-R)*', x) for x in csv_list]	# 'llt' is 'list of lists of tuple'
+	case_names_as_llt = [re.findall(r'(\d+KD-\d+M\d+)(-R)*', x) for x in csv_list]	# 'llt' is 'list of lists of tuple'
 	case_names_as_ll = [list(lt[0]) for lt in case_names_as_llt if len(lt) > 0]	# ll is 'list of lists'
 	case_names = {''.join(x) for x in case_names_as_ll}	# finally we have a set of unique strings
 
@@ -103,7 +104,7 @@ def local_southern(cases):
 	return cases
 
 def plot_cases(cases):
-	channels = {
+	all_channels = {
 				'IGH-A_channel_1':'blue',
 				'IGH-B_channel_1':'blue',
 				'IGH-C_channel_2':'green',
@@ -140,33 +141,29 @@ def plot_cases(cases):
 		# print(case.df.columns)
 		multipage = case.name + '.pdf'
 		with PdfPages(multipage) as pdf:
+			channels = {k:v for k,v in all_channels.items() if k in case.df.columns}
 			for ch in channels.keys():
-				ch_repeat = '_'.join([ch, 'repeat'])
 				png_name = case.name + '_' + ch + '.png'
+				# print(png_name)
+				ch_repeat = '_'.join([ch, 'repeat'])
+				if ch_repeat in case.df.columns: num_rows = 2
+				else: num_rows = 1
 				plt.clf()
+				p, axs = plt.subplots(nrows=num_rows, ncols=1)
+				p.subplots_adjust(hspace=0.5)
+				p.suptitle(case.name)
 				if 'SCL' in ch:
 					if case.ladder_success: c = 'green'
 					else: c = 'red'
-					print(png_name)
-					p, ax = plt.subplots()
 					for x in case.ladder_x:
-						ax.plot(x,case.df[ch][x], 'o', fillstyle='none', color=c)
-					ax.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
-					ax.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
-					plt.savefig(png_name, dpi=300)
-					pdf.savefig()
-					plt.close(p)
-				elif ch in case.df.columns and ch_repeat in case.df.columns:
-					print(png_name)
-					p, axs = plt.subplots(nrows=2, ncols=1)
-					p.subplots_adjust(hspace=0.5)
-					p.suptitle(case.name)
-
+						axs.plot(x,case.df[ch][x], 'o', fillstyle='none', color=c)
+					axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
+					axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
+				elif num_rows==2:
 					axs[0].plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
 					axs[1].plot(case.df['x_fitted'], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
 					axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 					axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-
 					for ax in axs:
 						ax.set_xlim([75, 450])
 						ax.set_ylabel('RFU', fontsize=6)
@@ -175,16 +172,28 @@ def plot_cases(cases):
 						for x_start,x_end in regions_of_interest[ch]:
 							ax.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
 						autoscale_y(ax)
+				elif num_rows==1:
+					axs.plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
+					axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+					axs.set_xlim([75, 450])
+					axs.set_ylabel('RFU', fontsize=6)
+					axs.set_xlabel('Fragment Size', fontsize=6)
+					axs.yaxis.set_tick_params(labelsize=6)
+					if ch in regions_of_interest.keys():
+						for x_start,x_end in regions_of_interest[ch]:
+							axs.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+					autoscale_y(axs)
 
-					plt.savefig(png_name, dpi=300)
-					pdf.savefig()
-					plt.close(p)
+				# plt.savefig(png_name, dpi=300)
+				pdf.savefig()
+				plt.close(p)
+			print('Done making {}'.format(multipage))
 
 def pick_peak_one(cases):
 	for case in cases.values():
 		case.ladder_success = False
 		scldf = case.df['SCL_channel_1']
-		print('Now working on {}'.format(case.name))
+		print('Loading {}'.format(case.name))
 		#Goal is to return the farther (on x axis) of the two tallest peaks
 		mask = scldf.index.isin(range(1500,2300))	# this range was determined by looking at 250+ cases
 		min_dist=20
