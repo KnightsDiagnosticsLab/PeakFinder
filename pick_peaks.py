@@ -268,9 +268,9 @@ def main():
 	cases = make_decay_curve(cases)
 	cases = local_southern(cases)
 
-	if not os.path.exists(owd + '/plots'):
-		os.mkdir(owd +'/plots')
-	os.chdir(owd + '/plots')
+	if not os.path.exists(path + '/plots'):
+		os.mkdir(path +'/plots')
+	os.chdir(path + '/plots')
 
 	plot_cases(cases)
 
