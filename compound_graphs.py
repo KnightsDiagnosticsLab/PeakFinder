@@ -103,7 +103,7 @@ def local_southern(cases):
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return cases
 
-def plot_cases(cases):
+def compound_plot_cases(cases):
 	all_channels = {
 				'IGH-A_channel_1':'blue',
 				'IGH-B_channel_1':'blue',
@@ -137,57 +137,41 @@ def plot_cases(cases):
 				'TCRG-B_channel_1':[(110,140),(195,220)],
 				'TCRG-B_channel_2':[(80,110),(160,195)]
 		}
-	for case in cases.values():
-		# print(case.df.columns)
-		multipage = case.name + '.pdf'
-		with PdfPages(multipage) as pdf:
-			channels = {k:v for k,v in all_channels.items() if k in case.df.columns}
-			for ch in channels.keys():
-				png_name = case.name + '_' + ch + '.png'
-				# print(png_name)
-				ch_repeat = '_'.join([ch, 'repeat'])
-				if ch_repeat in case.df.columns: num_rows = 2
-				else: num_rows = 1
-				plt.clf()
-				p, axs = plt.subplots(nrows=num_rows, ncols=1)
-				p.subplots_adjust(hspace=0.5)
-				p.suptitle(case.name)
-				if 'SCL' in ch:
-					if case.ladder_success: c = 'green'
-					else: c = 'red'
-					for x in case.ladder_x:
-						axs.plot(x,case.df[ch][x], 'o', fillstyle='none', color=c)
-					axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
-					axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
-				elif num_rows==2:
-					axs[0].plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
-					axs[1].plot(case.df['x_fitted'], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
-					axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-					axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-					for ax in axs:
-						ax.set_xlim([75, 450])
-						ax.set_ylabel('RFU', fontsize=6)
-						ax.set_xlabel('Fragment Size', fontsize=6)
-						ax.yaxis.set_tick_params(labelsize=6)
-						for x_start,x_end in regions_of_interest[ch]:
-							ax.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
-						autoscale_y(ax)
-				elif num_rows==1:
-					axs.plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
-					axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-					axs.set_xlim([75, 450])
-					axs.set_ylabel('RFU', fontsize=6)
-					axs.set_xlabel('Fragment Size', fontsize=6)
-					axs.yaxis.set_tick_params(labelsize=6)
-					if ch in regions_of_interest.keys():
-						for x_start,x_end in regions_of_interest[ch]:
-							axs.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
-					autoscale_y(axs)
+	multipage = 'all_channels.pdf'
+	with PdfPages(multipage) as pdf:
+		for ch in all_channels.keys():
+			# multipage = ch + '.pdf'
+			plt.clf()
+			p, axs = plt.subplots(nrows=1, ncols=1)
+			p.subplots_adjust(hspace=0.5)
+			# p.suptitle(ch)
+			axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+			if ch in regions_of_interest.keys():
+				for x_start,x_end in regions_of_interest[ch]:
+					axs.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+			for case in cases.values():
+				if ch in case.df.columns:
+					if 'SCL' in ch:
+						if case.ladder_success: c = 'green'
+						else: c = 'red'
+						for x in case.ladder_x:
+							axs.plot(x,case.df[ch][x], 'o', fillstyle='none', color=c)
+						axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, label=case.name)
+						axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
+					else:
+						# axs.plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=all_channels[ch])
+						axs.plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, label=case.name)
+						# axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+						axs.set_xlim([75, 450])
+						axs.set_ylabel('RFU', fontsize=6)
+						axs.set_xlabel('Fragment Size', fontsize=6)
+						axs.yaxis.set_tick_params(labelsize=6)
+						autoscale_y(axs)
 
-				# plt.savefig(png_name, dpi=300)
-				pdf.savefig()
-				plt.close(p)
-			print('Done making {}'.format(multipage))
+			plt.legend(prop={'size': 6, 'weight': 'medium'})
+			pdf.savefig()
+			plt.close(p)
+		print('Done making {}'.format(multipage))
 
 def pick_peak_one(cases):
 	for case in cases.values():
@@ -272,7 +256,7 @@ def main():
 		os.mkdir(owd +'/plots')
 	os.chdir(owd + '/plots')
 
-	plot_cases(cases)
+	compound_plot_cases(cases)
 
 if __name__ == '__main__':
 	main()
