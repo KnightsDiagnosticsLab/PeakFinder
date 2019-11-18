@@ -13,6 +13,7 @@ from scipy.signal import find_peaks, peak_prominences
 from types import SimpleNamespace
 from pprint import pprint
 from itertools import combinations
+import peakutils
 
 def autoscale_y(ax,margin=0.1):
 	"""Courtesy of Stack Overflow: https://stackoverflow.com/questions/29461608/matplotlib-fixing-x-axis-scale-and-autoscale-y-axis
@@ -137,7 +138,7 @@ def compound_plot_cases(cases):
 				'TCRG-B_channel_1':[(110,140),(195,220)],
 				'TCRG-B_channel_2':[(80,110),(160,195)]
 		}
-	multipage = 'all_channels.pdf'
+	multipage = 'all_channels_' + strftime("%Y%m%d-%H%M%S") + '.pdf'
 	with PdfPages(multipage) as pdf:
 		for ch in all_channels.keys():
 			# multipage = ch + '.pdf'
@@ -234,11 +235,38 @@ def evaluate_ladder(case, decay):
 			case.ladder_x = ladder_x
 	return case
 
+def adjust_base(peaks, col_df):
+	total_peaks = len(peaks['x'])
+	unique_left_bases = len(set(peaks['left_bases']))
+	unique_right_bases = len(set(peaks['right_bases']))
+	print(total_peaks, unique_left_bases, unique_right_bases)
+	peaks = zip(peaks['x'], peaks['left_bases'], peaks['right_bases'])
+	broadest = {(xl, xr) for x, xl, xr in peaks}
+	b_copy1 = broadest.copy()
+	b_copy2 = broadest.copy()
+	for xl, xr in b_copy1:
+		for yl, yr in b_copy2:
+			# print(xl, xr)
+			if xl != yl and xr != yr:
+				if xl <= yl and xr >= yr:
+					print('discarding yl,yr {}'.format((yl,yr)))
+					broadest.discard((yl,yr))
+				elif xl >= yl and xr <= yr:
+					print('discarding xl,xr {}'.format((xl,xr)))
+					broadest.discard((xl,xr))
+				# else:
+				# 	print('{} vs {}'.format((xl,xr), (yl,yr)))
+	pprint(broadest)
+	return peaks, col_df
+
 def replace_height_with_prominence(cases):
 	for case in cases.values():
 		for col in case.df.columns:
-			peaks_x, p = find_peaks(case.df[col], prominence=1)
-			case.df[col].loc[peaks_x] = p['prominences']
+			peaks_x, p = find_peaks(case.df[col], prominence=100)
+			# print(p.keys())
+			p['x'] = peaks_x
+			p, col_df = adjust_base(p, case.df[col])
+			# case.df[col].loc[peaks_x] = p['prominences']
 	return cases
 
 def main():
@@ -247,16 +275,16 @@ def main():
 	os.chdir(path)
 	cases = organize_files(path)
 	cases = gather_case_data(cases, path)
-	# cases = replace_height_with_prominence(cases)
-	cases = pick_peak_one(cases)
-	cases = make_decay_curve(cases)
-	cases = local_southern(cases)
+	cases = replace_height_with_prominence(cases)
+	# cases = pick_peak_one(cases)
+	# cases = make_decay_curve(cases)
+	# cases = local_southern(cases)
 
-	if not os.path.exists(path + '/plots'):
-		os.mkdir(path +'/plots')
-	os.chdir(path + '/plots')
+	# if not os.path.exists(path + '/plots'):
+	# 	os.mkdir(path +'/plots')
+	# os.chdir(path + '/plots')
 
-	compound_plot_cases(cases)
+	# compound_plot_cases(cases)
 
 if __name__ == '__main__':
 	main()
