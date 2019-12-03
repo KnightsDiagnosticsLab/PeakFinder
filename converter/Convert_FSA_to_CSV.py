@@ -4,7 +4,6 @@ from Bio import SeqIO
 from collections import defaultdict
 import pandas as pd
 import argparse
-import subprocess as sub
 import os
 import sys
 
