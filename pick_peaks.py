@@ -13,6 +13,7 @@ from scipy.signal import find_peaks, peak_prominences
 from types import SimpleNamespace
 from pprint import pprint
 from itertools import combinations
+import peakutils
 
 def autoscale_y(ax,margin=0.1):
 	"""Courtesy of Stack Overflow: https://stackoverflow.com/questions/29461608/matplotlib-fixing-x-axis-scale-and-autoscale-y-axis
@@ -160,10 +161,29 @@ def plot_cases(cases):
 					axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
 					axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
 				elif num_rows==2:
+					# first we get the max prominence
+					mask = case.df.index.isin(range(min(case.ladder_x),max(case.ladder_x)))
+					print(mask)
+					peaks_x, peak_prom = find_peaks(case.df[ch].where(mask, 0), prominence=1)
+					max_prom = max(peak_prom['prominences']) / 100.0
+					peaks_x, peak_prom = find_peaks(case.df[ch].where(mask, 0), prominence=max_prom)
+					# left_bases = sorted(peak_prom['left_bases'])
+					# right_bases = sorted(peak_prom['right_bases'])
+					bases = sorted(list(set(peak_prom['left_bases'] + peak_prom['right_bases'])))
+					# print(len(peaks_x), len(peak_prom['left_bases']))
+					# print(bases)
+					# peaks_x, _ = find_peaks(scldf.where(mask, 0), distance=min_dist)
+					# print(case.ladder_x)
+					# meow = case.df['x_fitted'].index[case.df['x_fitted'] > 75 and case.df['x_fitted'] < 450].tolist()
+					# print(meow)
+					axs[0].plot(case.df['x_fitted'][bases],case.df[ch][bases], 'o', fillstyle='none', color='green')
+					axs[0].plot(case.df['x_fitted'][bases],case.df[ch][bases], linewidth=0.25, color='red')
 					axs[0].plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
-					axs[1].plot(case.df['x_fitted'], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
 					axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+
+					axs[1].plot(case.df['x_fitted'], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
 					axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+
 					for ax in axs:
 						ax.set_xlim([75, 450])
 						ax.set_ylabel('RFU', fontsize=6)
@@ -172,6 +192,7 @@ def plot_cases(cases):
 						for x_start,x_end in regions_of_interest[ch]:
 							ax.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
 						autoscale_y(ax)
+
 				elif num_rows==1:
 					axs.plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
 					axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
