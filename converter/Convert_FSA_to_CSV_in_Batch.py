@@ -144,11 +144,18 @@ def metadata_dataframe(record, keys):
 	return df.reset_index()
 
 def find_3130_files(dir_path):
-	files = []
-	contents = os.listdir(dir_path)
-	for file in contents:
-		if file.endswith('.fsa'):
-			files.append(dir_path+'/'+file)
+	files = [os.path.join(root, file) for root, dirs, files in os.walk(dir_path) for file in files if file.endswith('.fsa')]
+	# print(files)
+	# for root, dirs, ff in os.walk(dir_path):
+	# 	print('root = {}'.format(root))
+	# 	print('dirs = {}'.format(dirs))
+	# 	print('ff = {}'.format(ff))
+	# 	print('---------------')
+	# files = []
+	# contents = os.listdir(dir_path)
+	# for file in contents:
+	# 	if file.endswith('.fsa'):
+	# 		files.append(dir_path+'/'+file)
 	return files
 
 def main():
@@ -159,8 +166,9 @@ def main():
 	abs_path_dir = os.path.abspath(input_dir)
 	files = find_3130_files(abs_path_dir)
 
-	for input_file in files:
+	print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
 
+	for input_file in files:
 		abs_input_file = os.path.abspath(input_file)
 		outfile = abs_input_file.split('.')[0] + '.csv'
 
