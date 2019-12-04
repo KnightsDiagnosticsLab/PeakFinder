@@ -22,7 +22,7 @@ def create_dataframe(record, keys):
 	url: https://projects.nfstc.org/workshops/resources/articles/ABIF_File_Format.pdf
 	'''
 	channels = []
-	cols = ['channel_1', 'channel_2', 'channel_3', 'channel_4', 
+	cols = [record.name + '.fsa.channel_1', record.name + '.fsa.channel_2', record.name + '.fsa.channel_3', record.name + '.fsa.channel_4', 
 			'Voltage, measured (decaVolts)', 'Current, Measured (milliAmps)',
 			'Power, Measured (milliWatts)', 'Temperature, measured (degress C)']
 	for key in keys:
