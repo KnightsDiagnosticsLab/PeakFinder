@@ -42,11 +42,14 @@ def autoscale_y(ax,margin=0.1):
 	ax.set_ylim(bot,top)
 
 def pretty_name(c,t):
-	channel = re.findall(r'channel_\d$', c)[0]
-	if 'repeat' in c:
-		pc = '_'.join([t, channel, 'repeat'])
+	if 'channel' in c:
+		channel = re.findall(r'channel_\d$', c)[0]
+		if 'repeat' in c:
+			pc = '_'.join([t, channel, 'repeat'])
+		else:
+			pc = '_'.join([t, channel])
 	else:
-		pc = '_'.join([t, channel])
+		pc = c
 	return pc
 
 def organize_files(path):
@@ -148,7 +151,6 @@ def plot_cases(cases):
 				ch_repeat = '_'.join([ch, 'repeat'])
 				if ch_repeat in case.df.columns: num_rows = 2
 				else: num_rows = 1
-				plt.clf()
 				p, axs = plt.subplots(nrows=num_rows, ncols=1)
 				p.subplots_adjust(hspace=0.5)
 				p.suptitle(case.name)
@@ -185,6 +187,7 @@ def plot_cases(cases):
 					autoscale_y(axs)
 
 				# plt.savefig(png_name, dpi=300)
+				# plt.show()
 				pdf.savefig()
 				plt.close(p)
 			print('Done making {}'.format(multipage))
@@ -257,6 +260,20 @@ def replace_height_with_prominence(cases):
 			case.df[col].loc[peaks_x] = p['prominences']
 	return cases
 
+def plot_channel_4(cases):
+	p, axs = plt.subplots(nrows=1, ncols=1)
+	for case in cases.values():
+		rox500_list = [ch for ch in case.df.columns if 'channel_4' in ch and 'SCL' not in ch]
+		# p, axs = plt.subplots(nrows=1, ncols=1)
+		for rox500 in rox500_list:
+			# p, axs = plt.subplots(nrows=1, ncols=1)
+			label_name = '_'.join([case.name, rox500])
+			axs.plot(case.df.index.tolist(), case.df[rox500], linewidth=0.25, label=label_name)
+	plt.legend(prop={'size': 6, 'weight': 'medium'})
+	plt.show()
+	plt.close(p)
+
+
 def main():
 	owd = os.getcwd()	# original working directory
 	path = os.path.abspath(sys.argv[1])
@@ -264,15 +281,16 @@ def main():
 	cases = organize_files(path)
 	cases = gather_case_data(cases, path)
 	# cases = replace_height_with_prominence(cases)
-	cases = pick_peak_one(cases)
-	cases = make_decay_curve(cases)
-	cases = local_southern(cases)
+	plot_channel_4(cases)
+	# cases = pick_peak_one(cases)
+	# cases = make_decay_curve(cases)
+	# cases = local_southern(cases)
 
-	if not os.path.exists(path + '/plots'):
-		os.mkdir(path +'/plots')
-	os.chdir(path + '/plots')
+	# if not os.path.exists(path + '/plots'):
+	# 	os.mkdir(path +'/plots')
+	# os.chdir(path + '/plots')
 
-	plot_cases(cases)
+	# plot_cases(cases)
 
 if __name__ == '__main__':
 	main()
