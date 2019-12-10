@@ -82,7 +82,8 @@ def gather_case_data(cases, path):
 		df = pd.DataFrame()
 		for t, files in case.files.items():
 			for f in files:
-				df_t = pd.read_csv('/'.join([path,f]))
+				df_t = pd.read_csv(os.path.join(path,f))
+#				print(df_t.shape)
 				df_t.columns = [pretty_name(c,t) for c in df_t.columns]
 				df = pd.concat([df, df_t], axis=1, sort=False)
 		df.name = case_name
@@ -260,19 +261,66 @@ def replace_height_with_prominence(cases):
 			case.df[col].loc[peaks_x] = p['prominences']
 	return cases
 
+def build_ladder(choices, k):
+	rox500_full = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450, 490, 500]
+	rox500_15 = [50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450, 490, 500]
+	rox500 = np.array(rox500_15[0:k])
+	if len(choices) <= k:
+		print('\tWARNING: len(choices) = {}, k = {}'.format(len(choices), k))
+	combos = np.array([c for c in combinations(choices, k)])
+	pfit = np.polyfit(rox500, combos.T, deg=1, full=True)
+	# print('\tsmallest residuals = {}'.format(np.amin(pfit[1])))
+	i = np.argmin(pfit[1])
+	# print('\tindex of smallest residuals = {}'.format(i))
+	# print('\tx-coordinates of ladder with smallest residuals = {}'.format(combos[i]))
+	best_ladder = combos[i]
+	# print(residuals)
+	print('\tchoices = {}, k = {}, combos = {}'.format(len(choices), k, len(combos)))
+	return best_ladder
+	# print(type(combos), combos.dtype)
+	# print(combos)
+	# print('\tlen(combos) = {}'.format(len(combos)))
+
 def plot_channel_4(cases):
+	k = 13
+	last_peaks = []
+	last_xy = []
 	p, axs = plt.subplots(nrows=1, ncols=1)
 	for case in cases.values():
-		rox500_list = [ch for ch in case.df.columns if 'channel_4' in ch and 'SCL' not in ch]
+		# if case.name == '19KD-323M0083':
+		# rox500_list = [ch for ch in case.df.columns if 'channel_4' in ch and 'SCL' not in ch]
+		rox500_list = [ch for ch in case.df.columns if 'channel_4' in ch]
 		# p, axs = plt.subplots(nrows=1, ncols=1)
 		for rox500 in rox500_list:
-			# p, axs = plt.subplots(nrows=1, ncols=1)
 			label_name = '_'.join([case.name, rox500])
-			axs.plot(case.df.index.tolist(), case.df[rox500], linewidth=0.25, label=label_name)
-	plt.legend(prop={'size': 6, 'weight': 'medium'})
+#			if case.df[rox500][case.df.index[-1]] > 50:
+			# if rox500 == 'TCRB-C_channel_4':
+			# p, axs = plt.subplots(nrows=1, ncols=1)
+			peaks_x, _ = find_peaks(case.df[rox500], height=[20,1000], distance=30)
+			if len(peaks_x) < k:
+				print('case.name = {}, channel = {}'.format(case.name, rox500))
+				print('WARNING: len(peaks_x) = {}, k = {}'.format(len(peaks_x), k))
+				# plt.close(p)
+				# p, axs = plt.subplots(nrows=1, ncols=1)
+				axs.plot(case.df.index.tolist(), case.df[rox500], linewidth=0.25, label=label_name)
+				axs.plot(peaks_x,case.df[rox500][peaks_x], 'o', fillstyle='none')
+				# plt.show()
+			else:
+				ladder = build_ladder(peaks_x, k)
+				ladder_y = [case.df[rox500][x] for x in ladder]
+				if min(ladder_y) <= 50:
+					axs.plot(peaks_x,case.df[rox500][peaks_x], 'o', fillstyle='none')
+					axs.plot(ladder,case.df[rox500][ladder], 'x', fillstyle='none')
+					axs.plot(case.df.index.tolist(), case.df[rox500], linewidth=0.25, label=label_name)
+					plt.legend(prop={'size': 6, 'weight': 'medium'})
+					last_peaks.append((label_name, peaks_x[-1]))
+					last_xy.append((label_name, case.df[rox500][case.df.index[-1]]))
 	plt.show()
 	plt.close(p)
-
+	last_peaks.sort(key=lambda e: e[1])
+	last_xy.sort(key=lambda e: e[1])
+	# for i in last_xy:
+	# 	print(i)
 
 def main():
 	owd = os.getcwd()	# original working directory
