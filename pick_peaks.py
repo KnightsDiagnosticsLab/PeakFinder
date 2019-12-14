@@ -15,6 +15,11 @@ from pprint import pprint
 from itertools import combinations
 import mpl_toolkits.mplot3d as m3d
 
+fig_size = plt.rcParams["figure.figsize"]
+fig_size[0] = 16
+fig_size[1] = 8
+plt.rcParams["figure.figsize"] = fig_size
+
 def autoscale_y(ax,margin=0.1):
 	"""Courtesy of Stack Overflow: https://stackoverflow.com/questions/29461608/matplotlib-fixing-x-axis-scale-and-autoscale-y-axis
 
@@ -323,14 +328,14 @@ def build_ladder(df, size_standard, label_name):
 	# 	print('\t\t\tbest_ladder_i = {}'.format(best_ladder_i))
 	# 	print('\t\t\tbest_ladder_j = {}'.format(best_ladder_j))
 	# if label_name in problem_cases:
-	p, axs = plt.subplots(nrows=2, ncols=1)
-	axs[0].plot(df[choices], 'o', fillstyle='none')
-	axs[0].plot(df[best_ladder_i], 'x', fillstyle='none')
-	axs[0].plot(df.index.tolist(), df, linewidth=0.25)
-	axs[0].plot(polyzx(ss),np.zeros(len(ss)), '|', color='red')
-	axs[0].plot(best_ladder_i, polyxy(best_ladder_i), linewidth=0.25)
-	axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) + 2*std, linewidth=0.25)
-	axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) - 2*std, linewidth=0.25)
+	p, axs = plt.subplots(nrows=1, ncols=1)
+	axs.plot(df[choices], 'o', fillstyle='none')
+	axs.plot(df[best_ladder_i], 'x', fillstyle='none')
+	axs.plot(df.index.tolist(), df, linewidth=0.25)
+	axs.plot(polyzx(ss),np.zeros(len(ss)), '|', color='red')
+	axs.plot(best_ladder_i, polyxy(best_ladder_i), linewidth=0.25)
+	axs.plot(df.index.tolist(), polyxy(df.index.tolist()) + 2*std, linewidth=0.25)
+	axs.plot(df.index.tolist(), polyxy(df.index.tolist()) - 2*std, linewidth=0.25)
 	plt.show()
 	plt.close(p)
 	# plt.legend(prop={'size': 6, 'weight': 'medium'})
@@ -361,14 +366,14 @@ def reduce_choices(df, label_name):
 	print('choices_y = {}'.format(choices_y))
 	print('std = {}'.format(std))
 	if len(choices_x) > 20:
-		p, axs = plt.subplots(nrows=2, ncols=1)
-		axs[0].plot(df[choices_x], 'o', fillstyle='none')
+		p, axs = plt.subplots(nrows=1, ncols=1)
+		axs.plot(df[choices_x], 'o', fillstyle='none')
 		# axs[0].plot(df[best_ladder_i], 'x', fillstyle='none')
-		axs[0].plot(df.index.tolist(), df, linewidth=0.25)
+		axs.plot(df.index.tolist(), df, linewidth=0.25)
 		# axs[0].plot(polyzx(ss),np.zeros(len(ss)), '|', color='red')
 		# axs[0].plot(best_ladder_i, polyxy(best_ladder_i), linewidth=0.25)
-		axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) + 2*std, linewidth=0.25)
-		axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) - 2*std, linewidth=0.25)
+		axs.plot(df.index.tolist(), polyxy(df.index.tolist()) + 2*std, linewidth=0.25)
+		axs.plot(df.index.tolist(), polyxy(df.index.tolist()) - 2*std, linewidth=0.25)
 		plt.show()
 		plt.close(p)
 	return choices_x, std
