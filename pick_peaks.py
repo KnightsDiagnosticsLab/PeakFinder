@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from time import strftime
-from scipy.signal import find_peaks, peak_prominences
+from scipy.signal import find_peaks, peak_prominences, peak_widths
 from types import SimpleNamespace
 from pprint import pprint
 from itertools import combinations
@@ -262,7 +262,8 @@ def replace_height_with_prominence(cases):
 			case.df[col].loc[peaks_x] = p['prominences']
 	return cases
 
-def build_ladder(df, choices, size_standard):
+def build_ladder(df, size_standard, label_name):
+	choices, std = reduce_choices(df, label_name)
 	ss = np.array(size_standard)
 	if len(choices) <= len(size_standard):
 		print('\tWARNING: len(choices) = {}, k = {}'.format(len(choices), len(size_standard)))
@@ -273,23 +274,30 @@ def build_ladder(df, choices, size_standard):
 	X_mean = np.expand_dims(np.mean(X,axis=1),axis=1)
 	total_zx = np.sum(np.square(X - X_mean))
 	R_sq_zx = 1.0 - (np.square(residuals_zx) / total_zx)
-	i = np.argmax(R_sq_zx)
+	# i = np.argmax(R_sq_zx)
+	ranked_R_sq, indices = np.unique(R_sq_zx, return_index=True)
+	i = indices[-1]
+	j = indices[-2]
+	# print('indices = {}'.format(indices))
+	# print('pfit_zx = {}'.format(pfit_zx))
+
+	# best fit for xy
+	# x2y = df.to_dict()
+	# Y = np.array([[x2y[x] for x in row] for row in X])
+	# R_sq_xy = []
+	# for x,y in zip(X,Y):
+	# 	polyxy = np.poly1d(np.polyfit(x,y,deg=1))
+	# 	# print('x = {}'.format(x))
+	# 	# print('y = {}'.format(y))
+	# 	# print('polyxy(x) = {}'.format(polyxy(x)))
+	# 	SS_tot = np.sum(np.square(y - np.mean(y)))
+	# 	SS_res = np.sum(np.square(y - polyxy(x)))
+	# 	R_sq_xy.append(1.0 - (SS_res / SS_tot))
+	# j = np.argmax(R_sq_xy)
 
 	# Now we compute some pseudo metric Hassan invented
-	x2y = df.to_dict()
-	Y = np.array([[x2y[x] for x in row] for row in X])
-	R_sq_xy = []
-	for x,y in zip(X,Y):
-		polyxy = np.poly1d(np.polyfit(x,y,deg=1))
-		# print('x = {}'.format(x))
-		# print('y = {}'.format(y))
-		# print('polyxy(x) = {}'.format(polyxy(x)))
-		SS_tot = np.sum(np.square(y - np.mean(y)))
-		SS_res = np.sum(np.square(y - polyxy(x)))
-		R_sq_xy.append(1.0 - (SS_res / SS_tot))
-	
-	R_sq = np.multiply(R_sq_zx, R_sq_xy)
-	j = np.argmax(R_sq)
+	# R_sq = np.multiply(R_sq_zx, R_sq_xy)
+	# k = np.argmax(R_sq)
 
 		# print('R_sq = {}'.format(R_sq))
 		# pfit_xy = np.polyfit(x,y, deg=1, full=True)
@@ -301,28 +309,77 @@ def build_ladder(df, choices, size_standard):
 		# r_sq_xy = 1.0 - (np.square(residuals_xy) / total_xy)
 		# # print('r_sq_xy = {}'.format(r_sq_xy))
 
-	# i = np.argmax(m)
 	best_ladder_i = X[i]
+	polyzx = np.poly1d(np.polyfit(ss,X[i],deg=1))
+	polyxy = np.poly1d(np.polyfit(X[i], df[X[i]], deg=1))
 	best_ladder_j = X[j]
-	if i != j:
-		print('\t\t\tbest_ladder_i = {}'.format(best_ladder_i))
-		print('\t\t\tbest_ladder_j = {}'.format(best_ladder_j))
-	return best_ladder_j
+	# best_ladder_k = X[k]
+	same = True
+	# for l in range(0,len(size_standard)):
+	# 	if best_ladder_i[l] != best_ladder_k[l]:
+	# 		same = False
+	# if not same:
+	# # if i != j:
+	# 	print('\t\t\tbest_ladder_i = {}'.format(best_ladder_i))
+	# 	print('\t\t\tbest_ladder_j = {}'.format(best_ladder_j))
+	# if label_name in problem_cases:
+	p, axs = plt.subplots(nrows=2, ncols=1)
+	axs[0].plot(df[choices], 'o', fillstyle='none')
+	axs[0].plot(df[best_ladder_i], 'x', fillstyle='none')
+	axs[0].plot(df.index.tolist(), df, linewidth=0.25)
+	axs[0].plot(polyzx(ss),np.zeros(len(ss)), '|', color='red')
+	axs[0].plot(best_ladder_i, polyxy(best_ladder_i), linewidth=0.25)
+	axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) + 2*std, linewidth=0.25)
+	axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) - 2*std, linewidth=0.25)
+	plt.show()
+	plt.close(p)
+	# plt.legend(prop={'size': 6, 'weight': 'medium'})
+	return best_ladder_i, same
 
-def reduce_choices(df):
-	# peaks_x, _ = find_peaks(df, height=[20], distance=30)
-	peaks_x, _ = find_peaks(df, height=[20])
+# problem_cases = ['19KD-325M0043_TCRG-A_channel_4',
+# '19KD-330M0074_TCRB-B_channel_4_repeat',
+# '19KD-325M0070_TCRB-B_channel_4_repeat',
+# '19KD-325M0070_TCRB-B_channel_4']
+problem_cases = ['19KD-325M0070_TCRB-B_channel_4']
+
+def reduce_choices(df, label_name):
+	peaks_x_restricted, _ = find_peaks(df, height=[20,1000], distance=30, width=2)
+	peaks_x, _ = find_peaks(df)
 	coor = [(x,df[x]) for x in peaks_x]
 	tallest = sorted(coor, key=lambda x: x[1])[-1]
-	choices = [x for x,y in coor if x > tallest[0] and y <1000]
-	print('len(choices) = {}'.format(len(choices)))
-	return choices
+	choices_x = [x for x in peaks_x_restricted if x > tallest[0]]
+	choices_y = [df[x] for x in choices_x]
+	polyxy = np.poly1d(np.polyfit(choices_x, choices_y, deg=1))
+	polybase = np.poly1d(np.polyfit(df.index.tolist()[choices_x[0]:], df[choices_x[0]:],deg=1))
+	std = np.std(choices_y)
+	std2_below = polyxy(df.index.to_list()) - 2*std
+	std2_above = polyxy(df.index.to_list()) + 2*std
+	std2 = [(x1,x2) for x1, x2 in zip(std2_below, std2_above)]
+	peaks_x, _ = find_peaks(df, height=[std2_below, std2_above], prominence=20, width=2)
+	choices_x = [x for x in peaks_x if x > tallest[0]]
+	print('choices_x length = {}'.format(len(choices_x)))
+	print('choices_y = {}'.format(choices_y))
+	print('std = {}'.format(std))
+	if len(choices_x) > 20:
+		p, axs = plt.subplots(nrows=2, ncols=1)
+		axs[0].plot(df[choices_x], 'o', fillstyle='none')
+		# axs[0].plot(df[best_ladder_i], 'x', fillstyle='none')
+		axs[0].plot(df.index.tolist(), df, linewidth=0.25)
+		# axs[0].plot(polyzx(ss),np.zeros(len(ss)), '|', color='red')
+		# axs[0].plot(best_ladder_i, polyxy(best_ladder_i), linewidth=0.25)
+		axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) + 2*std, linewidth=0.25)
+		axs[0].plot(df.index.tolist(), polyxy(df.index.tolist()) - 2*std, linewidth=0.25)
+		plt.show()
+		plt.close(p)
+	return choices_x, std
 
 def plot_channel_4(cases):
 	rox500_16 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450, 490, 500]
+	rox500_14 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500_13 = [50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
-	rox500 = rox500_13
-	p, axs = plt.subplots(nrows=1, ncols=1)
+	rox500_75_400 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400]
+	rox500 = rox500_75_400
+	# p, axs = plt.subplots(nrows=1, ncols=1)
 	for case in cases.values():
 		# if case.name == '19KD-323M0083':
 		# ladder_channels = [ch for ch in case.df.columns if 'channel_4' in ch and 'SCL' not in ch]
@@ -334,32 +391,33 @@ def plot_channel_4(cases):
 			# if ch == 'TCRB-C_channel_4':
 			# p, axs = plt.subplots(nrows=1, ncols=1)
 			# peaks_x, _ = find_peaks(case.df[ch], height=[20], distance=30)
-			choices = reduce_choices(case.df[ch])
-			if len(choices) < len(rox500):
-				print('case.name = {}, channel = {}'.format(case.name, ch))
-				print('WARNING: len(choices) = {}, k = {}'.format(len(choices), len(rox500)))
-				# plt.close(p)
-				# p, axs = plt.subplots(nrows=1, ncols=1)
-				axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, label=label_name)
-				axs.plot(choices,case.df[ch][choices], 'o', fillstyle='none')
-				# plt.show()
+			# choices = reduce_choices(case.df[ch], label_name)
+			# choices, std = reduce_choices_2(case.df[ch], label_name)
+			# if len(choices) < len(rox500):
+			# 	print('case.name = {}, channel = {}'.format(case.name, ch))
+			# 	print('WARNING: len(choices) = {}, k = {}'.format(len(choices), len(rox500)))
+			# 	# plt.close(p)
+			# 	p, axs = plt.subplots(nrows=1, ncols=1)
+			# 	axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, label=label_name)
+			# 	axs.plot(choices,case.df[ch][choices], 'o', fillstyle='none')
+			# 	plt.show()
+			# 	plt.close(p)
 			# else:
 			# elif label_name == '19KD-325M0070_TCRG-A_channel_4_repeat':
-			elif 'SCL' in label_name:
+			if 'SCL' not in label_name:
 				print('working on {}'.format(label_name))
-				ladder = build_ladder(case.df[ch], choices, rox500)
-				# ladder = build_ladder_LinearRegression(case.df[ch], choices, rox500)
-				# ladder_3d = build_ladder_3d(case.df[ch], choices, rox500)
-				# ladder_lstsq = build_ladder_lstsq(case.df[ch], choices, rox500)
+				ladder, same = build_ladder(case.df[ch], rox500, label_name)
+				# if not same:
 				# ladder_y = [case.df[ch][x] for x in ladder]
 				# if max(ladder_y) > 500:
 				# if min(ladder_y) <= 50 and max(ladder_y) >= 500:
-				axs.plot(choices,case.df[ch][choices], 'o', fillstyle='none')
-				axs.plot(ladder,case.df[ch][ladder], 'x', fillstyle='none')
-				axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, label=label_name)
-				plt.legend(prop={'size': 6, 'weight': 'medium'})
-	plt.show()
-	plt.close(p)
+				# p, axs = plt.subplots(nrows=1, ncols=1)
+			# 	axs.plot(choices,case.df[ch][choices], 'o', fillstyle='none')
+			# 	axs.plot(ladder,case.df[ch][ladder], 'x', fillstyle='none')
+			# 	axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, label=label_name)
+			# 	plt.legend(prop={'size': 6, 'weight': 'medium'})
+			# plt.show()
+			# plt.close(p)
 
 def main():
 	owd = os.getcwd()	# original working directory
