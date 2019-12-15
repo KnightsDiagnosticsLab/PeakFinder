@@ -101,14 +101,14 @@ def gather_case_data(cases, path):
 		case.df = df
 	return cases
 
-def local_southern_2(cases):
+def local_southern(cases):
 	for case in cases.values():
 		# print(case.df.keys())
 		for ch_4, ladder in case.ladder.items():
-			print(ch_4, ladder)
-			print('rox500 = {}'.format(case.rox500))
+			# print(ch_4, ladder)
+			# print('rox500 = {}'.format(case.rox500))
 			x_fitted = np.array([])
-			print(case.df.index.tolist())
+			# print(case.df.index.tolist())
 			for i in range(2,len(ladder)-1):
 				# print(i)
 				x1 = ladder[i-2:i+1]
@@ -138,23 +138,6 @@ def local_southern_2(cases):
 		# for ch, df in case.df.items():
 		# 	ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
 		# 	print('{}.{}.ladder = {}'.format(case.name, ch, case.ladder[ch_4]))
-	return cases
-
-def local_southern(cases):
-	for case in cases.values():
-		# print('local_southern now working on {}'.format(case.name))
-		p_one = np.polyfit([x for x in case.ladder_SCL[0:3]], [100,200,300], 2)
-		p_two = np.polyfit([x for x in case.ladder_SCL[1:4]], [200,300,400], 2)
-
-		x_0_to_200 = [x*x*p_one[0] + x*p_one[1] + p_one[2] for x in case.df.index.tolist()]
-		x_300_to_400 = [x*x*p_two[0] + x*p_two[1] + p_two[2] for x in case.df.index.tolist()]
-		x_200_to_300 = [(x1+x2)/2 for x1,x2 in zip(*[x_0_to_200, x_300_to_400])]
-
-		x_fitted = x_0_to_200[:case.ladder_SCL[1]] + x_200_to_300[case.ladder_SCL[1]:case.ladder_SCL[2]] + x_300_to_400[case.ladder_SCL[2]:]
-
-		x_df = pd.DataFrame(x_fitted)
-		x_df.columns = ['x_fitted']
-		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return cases
 
 def plot_cases(cases):
@@ -429,7 +412,7 @@ def main():
 	cases = size_standard(cases)
 	cases = pick_peak_one(cases)
 	cases = make_decay_curve(cases)
-	cases = local_southern_2(cases)
+	cases = local_southern(cases)
 
 	if not os.path.exists(path + '/plots'):
 		os.mkdir(path +'/plots')
