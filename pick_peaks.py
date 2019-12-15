@@ -107,12 +107,34 @@ def local_southern_2(cases):
 		for ch_4, ladder in case.ladder.items():
 			print(ch_4, ladder)
 			print('rox500 = {}'.format(case.rox500))
+			x_fitted = np.array([])
+			print(case.df.index.tolist())
 			for i in range(2,len(ladder)-1):
 				# print(i)
-				x1 = case.rox500[i-2:i+1]
-				print(x1)
+				x1 = ladder[i-2:i+1]
+				y1 = case.rox500[i-2:i+1]
+				polyx1 = np.poly1d(np.polyfit(x1,y1,deg=2))
+				x2 = ladder[i-1:i+2]
+				y2 = case.rox500[i-1:i+2]
+				polyx2 = np.poly1d(np.polyfit(x2,y2,deg=2))
+				if i == 2:
+					x = range(case.df.index.tolist()[0], ladder[i])
+				elif i == len(ladder)-1:
+					x = range(ladder[i-1], case.df.index.tolist()[-1]+1)
+				else:
+					x = range(ladder[i-1], ladder[i])
+				y = np.average(np.array([polyx1(x), polyx2(x)]), axis=0)
+				x_fitted = np.concatenate((x_fitted, y), axis=0)
+				# x_fitted.append(y.tolist())
+				# print(y)
+				# print('Two below, one above = {}'.format(x1))
+				# print('One below, two above = {}'.format(x2))
 			# for i, item in enumerate(ladder):
-
+			# print(x_fitted)
+			x_df = pd.DataFrame(x_fitted)
+			col_name = '_'.join(['x_fitted', ch_4])
+			x_df.columns = [col_name]
+			case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 		# for ch, df in case.df.items():
 		# 	ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
 		# 	print('{}.{}.ladder = {}'.format(case.name, ch, case.ladder[ch_4]))
@@ -175,6 +197,7 @@ def plot_cases(cases):
 		with PdfPages(multipage) as pdf:
 			channels = {k:v for k,v in all_channels.items() if k in case.df.columns}
 			for ch in channels.keys():
+				x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 				png_name = case.name + '_' + ch + '.png'
 				# print(png_name)
 				ch_repeat = '_'.join([ch, 'repeat'])
@@ -191,8 +214,8 @@ def plot_cases(cases):
 					axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
 					axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
 				elif num_rows==2:
-					axs[0].plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
-					axs[1].plot(case.df['x_fitted'], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
+					axs[0].plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
+					axs[1].plot(case.df[x_col_name], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
 					axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 					axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 					for ax in axs:
@@ -204,7 +227,7 @@ def plot_cases(cases):
 							ax.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
 						autoscale_y(ax)
 				elif num_rows==1:
-					axs.plot(case.df['x_fitted'], case.df[ch], linewidth=0.25, color=channels[ch])
+					axs.plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
 					axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 					axs.set_xlim([75, 450])
 					axs.set_ylabel('RFU', fontsize=6)
