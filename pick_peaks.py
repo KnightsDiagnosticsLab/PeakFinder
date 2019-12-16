@@ -101,6 +101,19 @@ def gather_case_data(cases, path):
 		case.df = df
 	return cases
 
+def gather_case_data_2(case, case_name, path):
+	df = pd.DataFrame()
+	for t, files in case.files.items():
+		for f in files:
+			df_t = pd.read_csv(os.path.join(path,f))
+			df_t.columns = [pretty_name(c,t) for c in df_t.columns]
+			columns_to_drop = [c for c in df_t.columns if not (c.startswith('TCR') or c.startswith('IG') or c.startswith('SCL'))]
+			df_t = df_t.drop(columns_to_drop, axis=1)
+			df = pd.concat([df, df_t], axis=1, sort=False)
+	df.name = case_name
+	case.df = df
+	return case
+
 def local_southern(cases):
 	for case in cases.values():
 		# print(case.df.keys())
@@ -139,6 +152,32 @@ def local_southern(cases):
 		# 	ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
 		# 	print('{}.{}.ladder = {}'.format(case.name, ch, case.ladder[ch_4]))
 	return cases
+
+def local_southern_2(case):
+	for ch_4, ladder in case.ladder.items():
+		x_fitted = np.array([])
+		for i in range(2,len(ladder)-1):
+			x1 = ladder[i-2:i+1]
+			y1 = case.rox500[i-2:i+1]
+			polyx1 = np.poly1d(np.polyfit(x1,y1,deg=2))
+			x2 = ladder[i-1:i+2]
+			y2 = case.rox500[i-1:i+2]
+			polyx2 = np.poly1d(np.polyfit(x2,y2,deg=2))
+			if i == 2:
+				x = range(case.df.index.tolist()[0], ladder[i])
+			elif i == len(ladder)-2:
+				x = range(ladder[i-1], case.df.index.tolist()[-1]+1)
+				# print('x[0] = {}, x[-1] = {}'.format(x[0], x[-1]))
+			else:
+				x = range(ladder[i-1], ladder[i])
+			y = np.average(np.array([polyx1(x), polyx2(x)]), axis=0)
+			x_fitted = np.concatenate((x_fitted, y), axis=0)
+		x_df = pd.DataFrame(x_fitted)
+		# print('len(x_fitted) = {}'.format(len(x_fitted)))
+		col_name = '_'.join(['x_fitted', ch_4])
+		x_df.columns = [col_name]
+		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
+	return case
 
 def plot_cases(cases):
 	all_channels = {
@@ -227,6 +266,87 @@ def plot_cases(cases):
 				plt.close(p)
 			print('Done making {}'.format(multipage))
 
+def plot_case(case):
+	all_channels = {
+				'IGH-A_channel_1':'blue',
+				'IGH-B_channel_1':'blue',
+				'IGH-C_channel_2':'green',
+				'IGK-A_channel_1':'blue',
+				'IGK-B_channel_1':'blue',
+				'TCRB-A_channel_1':'blue',
+				'TCRB-A_channel_2':'green',
+				'TCRB-B_channel_1':'blue',
+				'TCRB-C_channel_1':'blue',
+				'TCRB-C_channel_2':'green',
+				'TCRG-A_channel_1':'blue',
+				'TCRG-A_channel_2':'green',
+				'TCRG-B_channel_1':'blue',
+				'TCRG-B_channel_2':'green',
+				'SCL_channel_1':'blue'
+		}
+	regions_of_interest = {
+				'IGH-A_channel_1':[(310,360)],
+				'IGH-B_channel_1':[(250,295)],
+				'IGH-C_channel_2':[(100,170)],
+				'IGK-A_channel_1':[(120,160),(190,210),(260,300)],
+				'IGK-B_channel_1':[(210,250),(270,300),(350,390)],
+				'TCRB-A_channel_1':[(240,285)],
+				'TCRB-A_channel_2':[(240,285)],
+				'TCRB-B_channel_1':[(240,285)],
+				'TCRB-C_channel_1':[(170,210),(285,325)],
+				'TCRB-C_channel_2':[(170,210),(285,325)],
+				'TCRG-A_channel_1':[(175,195),(230,255)],
+				'TCRG-A_channel_2':[(145,175),(195,230)],
+				'TCRG-B_channel_1':[(110,140),(195,220)],
+				'TCRG-B_channel_2':[(80,110),(160,195)]
+		}
+	multipage = case.name + '.pdf'
+	with PdfPages(multipage) as pdf:
+		channels = {k:v for k,v in all_channels.items() if k in case.df.columns}
+		for ch in channels.keys():
+			x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+			png_name = case.name + '_' + ch + '.png'
+			ch_repeat = '_'.join([ch, 'repeat'])
+			if ch_repeat in case.df.columns: num_rows = 2
+			else: num_rows = 1
+			p, axs = plt.subplots(nrows=num_rows, ncols=1)
+			p.subplots_adjust(hspace=0.5)
+			p.suptitle(case.name)
+			if 'SCL' in ch:
+				if case.ladder_success: c = 'green'
+				else: c = 'red'
+				for x in case.ladder_SCL:
+					axs.plot(x,case.df[ch][x], 'o', fillstyle='none', color=c)
+				axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
+				axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
+			elif num_rows==2:
+				axs[0].plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
+				axs[1].plot(case.df[x_col_name], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
+				axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+				axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+				for ax in axs:
+					ax.set_xlim([75, 450])
+					ax.set_ylabel('RFU', fontsize=6)
+					ax.set_xlabel('Fragment Size', fontsize=6)
+					ax.yaxis.set_tick_params(labelsize=6)
+					for x_start,x_end in regions_of_interest[ch]:
+						ax.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+					autoscale_y(ax)
+			elif num_rows==1:
+				axs.plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
+				axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+				axs.set_xlim([75, 450])
+				axs.set_ylabel('RFU', fontsize=6)
+				axs.set_xlabel('Fragment Size', fontsize=6)
+				axs.yaxis.set_tick_params(labelsize=6)
+				if ch in regions_of_interest.keys():
+					for x_start,x_end in regions_of_interest[ch]:
+						axs.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+				autoscale_y(axs)
+			pdf.savefig()
+			plt.close(p)
+		print('Done making {}'.format(multipage))
+
 def pick_peak_one(cases):
 	for case in cases.values():
 		case.ladder_success = False
@@ -251,6 +371,29 @@ def pick_peak_one(cases):
 				print('\t\t{}'.format(f))
 	return cases
 
+def pick_peak_one_2(case):
+	case.ladder_success = False
+	scldf = case.df['SCL_channel_1']
+	#Goal is to return the farther (on x axis) of the two tallest peaks
+	mask = scldf.index.isin(range(1500,2300))	# this range was determined by looking at 250+ cases
+	min_dist=20
+	if mask.size == scldf.size:
+		peaks_x, _ = find_peaks(scldf.where(mask, 0), distance=min_dist)
+		peaks_2tallest = sorted([(x, scldf[x]) for x in peaks_x], key=lambda coor: coor[1], reverse=True)[:2]
+		peak_farther_of_2tallest = sorted(peaks_2tallest, key=lambda coor: coor[0], reverse=True)[0]
+		case.peak_one = peak_farther_of_2tallest
+		mask = scldf.index.isin(range(case.peak_one[0], scldf.size))
+		peaks_x, _ = find_peaks(scldf.where(mask, 0), distance=min_dist)
+		case.peaks = [(x, scldf[x]) for x in sorted(peaks_x, reverse=False)]
+	else:
+		# print(case.name)
+		# print(mask.size)
+		# print(scldf.size)
+		print('\tSkipping {} due to size mismatch, likely due to multiple files being added to the same column in the case DataFrame column'.format(case.name))
+		for f in case.files['SCL']:
+			print('\t\t{}'.format(f))
+	return case
+
 def make_decay_curve(cases):
 	for case in cases.values():
 		a = case.peak_one[1]
@@ -272,6 +415,25 @@ def make_decay_curve(cases):
 		# print('{}\ti = {}, residual = {}'.format(case.name, i, case.residual))
 	return cases
 
+def make_decay_curve_2(case):
+	a = case.peak_one[1]
+	b = 0.5
+	x_decay = np.array(range(case.peak_one[0],len(case.df.index.tolist())))
+	i = 0
+	while i < 20:
+		i += 0.1
+		y_decay = a*b**(i*(x_decay - case.peak_one[0])/case.peak_one[0])
+		decay = pd.Series(data=y_decay,index=x_decay)
+		decay.name = 'decay'
+		if decay.name not in case.df.columns: case.df = pd.concat([case.df, decay], axis=1, sort=False)
+		else: case.df[decay.name] = decay
+		case = evaluate_SCL(case, decay)
+		if case.residual <= 10:
+			case.ladder_success = True
+			break
+	case.decay_value = i
+	return case
+
 def evaluate_SCL(case, decay):
 	qualifying_peaks = [(x,y) for x,y in case.peaks if y > decay[x]]
 	combos = [list(c) for c in combinations(qualifying_peaks, 3)]
@@ -286,13 +448,6 @@ def evaluate_SCL(case, decay):
 			case.residual = res_current
 			case.ladder_SCL = ladder_SCL
 	return case
-
-def replace_height_with_prominence(cases):
-	for case in cases.values():
-		for col in case.df.columns:
-			peaks_x, p = find_peaks(case.df[col], prominence=1)
-			case.df[col].loc[peaks_x] = p['prominences']
-	return cases
 
 def build_ladder(df, size_standard, label_name):
 	choices, std = reduce_choices(df, label_name)
@@ -365,6 +520,19 @@ def reduce_choices(df, label_name):
 		plt.close(p)
 	return choices_x, std
 
+def size_standard_2(case, channel='channel_4'):
+	rox500_16 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450, 490, 500]
+	rox500_14 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
+	rox500_13 = [50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
+	rox500_75_400 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400]
+	rox500 = rox500_75_400
+	case.rox500 = rox500[:]
+	ladder_channels = [ch for ch in case.df.columns if channel in ch]
+	for ch in ladder_channels:
+		label_name = '_'.join([case.name, ch])
+		case.ladder[ch] = build_ladder(case.df[ch], rox500, label_name)
+	return case
+
 def size_standard(cases, channel='channel_4'):
 	rox500_16 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450, 490, 500]
 	rox500_14 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
@@ -407,18 +575,29 @@ def main():
 	path = os.path.abspath(sys.argv[1])
 	os.chdir(path)
 	cases = organize_files(path)
-	cases = gather_case_data(cases, path)
-	# cases = replace_height_with_prominence(cases)
-	cases = size_standard(cases)
-	cases = pick_peak_one(cases)
-	cases = make_decay_curve(cases)
-	cases = local_southern(cases)
+	# output_path = os.path.join(path, '/plots')
+	# if not os.path.exists(output_path): os.mkdir(output_path)
+	for case_name, case in cases.items():
+		print('Processing raw data for {}'.format(case_name))
+		case = gather_case_data_2(case, case_name, path)
+		case = size_standard_2(case)
+		case = pick_peak_one_2(case)
+		case = make_decay_curve_2(case)
+		case = local_southern_2(case)
+		plot_case(case)
+	# os.chdir(path + '/plots')
 
-	if not os.path.exists(path + '/plots'):
-		os.mkdir(path +'/plots')
-	os.chdir(path + '/plots')
+	# cases = gather_case_data(cases, path)
+	# cases = size_standard(cases)
+	# cases = pick_peak_one(cases)
+	# cases = make_decay_curve(cases)
+	# cases = local_southern(cases)
 
-	plot_cases(cases)
+	# if not os.path.exists(path + '/plots'):
+	# 	os.mkdir(path +'/plots')
+	# os.chdir(path + '/plots')
+
+	# plot_cases(cases)
 
 if __name__ == '__main__':
 	main()
