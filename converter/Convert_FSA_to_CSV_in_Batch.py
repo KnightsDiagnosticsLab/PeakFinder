@@ -12,6 +12,7 @@ import sys
 def create_parser():
 	parser = argparse.ArgumentParser(description="This program converts Thermo Fisher 3100 Genetic Analyzer FSA files to CSV.")
 	parser.add_argument("-d", dest="input", type=str, nargs=1 , help="Input FSA Directory.", required=True)
+	parser.add_argument("-co", dest="channels_only", action='store_true', default=False, help="Option returns only Channels in CSV.", required=False)
 	#parser.add_argument("-o", dest="output", type=str, nargs=1, help="output CSV file", required=True) 
 	args = parser.parse_args()
 	return args
@@ -172,7 +173,12 @@ def main():
 
 		results = pd.concat([data, metadata], axis=1)
 		del results['index']
-		results.to_csv(outfile, index=False, header=True)
+
+		if myargs.channels_only:
+			results = results.iloc[:,0:4]
+			results.to_csv(outfile, index=False, header=True)
+		else:
+			results.to_csv(outfile, index=False, header=True)
 
 
 if __name__ == '__main__':
