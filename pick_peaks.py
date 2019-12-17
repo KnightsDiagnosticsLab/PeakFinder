@@ -10,11 +10,14 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from time import strftime
 from scipy.signal import find_peaks, peak_prominences, peak_widths
+from scipy.interpolate import InterpolatedUnivariateSpline
 from types import SimpleNamespace
 from pprint import pprint
 from itertools import combinations
 import mpl_toolkits.mplot3d as m3d
 import re
+
+timestr = strftime("%Y%m%d-%H%M%S")
 
 fig_size = plt.rcParams["figure.figsize"]
 fig_size[0] = 8
@@ -126,47 +129,9 @@ def local_southern(case):
 	return case
 
 def plot_case(case):
-	all_channels = {
-				'IGH-A_channel_1':'blue',
-				'IGH-B_channel_1':'blue',
-				'IGH-C_channel_2':'green',
-				'IGK-A_channel_1':'blue',
-				'IGK-B_channel_1':'blue',
-				'TCRB-A_channel_1':'blue',
-				'TCRB-A_channel_2':'green',
-				# 'TCRB-A_channel_4':'black',
-				# 'TCRB-A_channel_4_repeat':'black',
-				# 'TCRB-B_channel_4':'black',
-				# 'TCRB-B_channel_4_repeat':'black',
-				'TCRB-B_channel_1':'blue',
-				# 'TCRB-B_channel_4':'black',
-				# 'TCRB-B_channel_4_repeat':'black',
-				'TCRB-C_channel_1':'blue',
-				'TCRB-C_channel_2':'green',
-				'TCRG-A_channel_1':'blue',
-				'TCRG-A_channel_2':'green',
-				# 'TCRG-A_channel_4':'black',
-				# 'TCRG-A_channel_4_repeat':'black',
-				'TCRG-B_channel_1':'blue',
-				'TCRG-B_channel_2':'green',
-				'SCL_channel_1':'blue'
-		}
-	regions_of_interest = {
-				'IGH-A_channel_1':[(310,360)],
-				'IGH-B_channel_1':[(250,295)],
-				'IGH-C_channel_2':[(100,170)],
-				'IGK-A_channel_1':[(120,160),(190,210),(260,300)],
-				'IGK-B_channel_1':[(210,250),(270,300),(350,390)],
-				'TCRB-A_channel_1':[(240,285)],
-				'TCRB-A_channel_2':[(240,285)],
-				'TCRB-B_channel_1':[(240,285)],
-				'TCRB-C_channel_1':[(170,210),(285,325)],
-				'TCRB-C_channel_2':[(170,210),(285,325)],
-				'TCRG-A_channel_1':[(175,195),(230,255)],
-				'TCRG-A_channel_2':[(145,175),(195,230)],
-				'TCRG-B_channel_1':[(110,140),(195,220)],
-				'TCRG-B_channel_2':[(80,110),(160,195)]
-		}
+	x_window_start = 75
+	x_window_end = 450
+	# multipage = case.name + '_' + timestr + '.pdf'
 	multipage = case.name + '.pdf'
 	with PdfPages(multipage) as pdf:
 		channels = {k:v for k,v in all_channels.items() if k in case.df.columns}
@@ -196,7 +161,7 @@ def plot_case(case):
 				if case.ladder_success: c = 'green'
 				else: c = 'red'
 				for x in case.ladder_SCL:
-					axs.plot(x,case.df[ch][x], 'o', fillstyle='none', color=c)
+					axs.plot(x, case.df[ch][x], 'o', fillstyle='none', color=c)
 				axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
 				axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
 			elif num_rows==2:
@@ -205,7 +170,7 @@ def plot_case(case):
 				axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 				axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 				for ax in axs:
-					ax.set_xlim([75, 450])
+					ax.set_xlim([x_window_start, x_window_end])
 					ax.set_ylabel('RFU', fontsize=6)
 					ax.set_xlabel('Fragment Size', fontsize=6)
 					ax.yaxis.set_tick_params(labelsize=6)
@@ -216,7 +181,7 @@ def plot_case(case):
 			elif num_rows==1:
 				axs.plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
 				axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-				axs.set_xlim([75, 450])
+				axs.set_xlim([x_window_start, x_window_end])
 				axs.set_ylabel('RFU', fontsize=6)
 				axs.set_xlabel('Fragment Size', fontsize=6)
 				axs.yaxis.set_tick_params(labelsize=6)
@@ -301,8 +266,8 @@ def build_ladder(df, size_standard, label_name):
 	i = indices[-1]
 	best_ladder_i = X[i]
 
-	polyzx = np.poly1d(np.polyfit(ss,X[i],deg=1))
-	polyxy = np.poly1d(np.polyfit(X[i], df[X[i]], deg=1))
+	# polyzx = np.poly1d(np.polyfit(ss,X[i],deg=1))
+	# polyxy = np.poly1d(np.polyfit(X[i], df[X[i]], deg=1))
 	# if label_name in problem_cases:
 	# p, axs = plt.subplots(nrows=1, ncols=1)
 	# axs.plot(df[choices], 'o', fillstyle='none')
@@ -382,6 +347,73 @@ def size_standard(case, channel='channel_4'):
 			# plt.show()
 			# plt.close(p)
 
+def baseline_correction(case):
+	for ch in case.df.columns:
+		ch_repeat = '_'.join([ch, 'repeat'])
+		if ch in all_channels.keys() and 'SCL' not in ch:
+			label_name = '_'.join([case.name, ch])
+			if debug: print(label_name)
+			for i in range(0,3):
+				_, prop = find_peaks(case.df[ch], prominence=1, distance=10)
+				bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
+				spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
+				spl_df = pd.Series(spl(case.df.index.tolist()))
+				case.df[ch] = case.df[ch] - spl_df
+		if ch_repeat in case.df.columns and 'SCL' not in ch_repeat:
+			label_name = '_'.join([case.name, ch_repeat])
+			if debug: print(label_name)
+			for i in range(0,3):
+				_, prop = find_peaks(case.df[ch_repeat], prominence=1, distance=10)
+				bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
+				spl = InterpolatedUnivariateSpline(bases, case.df[ch_repeat][bases])
+				spl_df = pd.Series(spl(case.df.index.tolist()))
+				case.df[ch_repeat] = case.df[ch_repeat] - spl_df
+	return case
+
+all_channels = {
+			'IGH-A_channel_1':'blue',
+			'IGH-B_channel_1':'blue',
+			'IGH-C_channel_2':'green',
+			'IGK-A_channel_1':'blue',
+			'IGK-B_channel_1':'blue',
+			'TCRB-A_channel_1':'blue',
+			'TCRB-A_channel_2':'green',
+			# 'TCRB-A_channel_4':'black',
+			# 'TCRB-A_channel_4_repeat':'black',
+			# 'TCRB-B_channel_4':'black',
+			# 'TCRB-B_channel_4_repeat':'black',
+			'TCRB-B_channel_1':'blue',
+			# 'TCRB-B_channel_4':'black',
+			# 'TCRB-B_channel_4_repeat':'black',
+			'TCRB-C_channel_1':'blue',
+			'TCRB-C_channel_2':'green',
+			'TCRG-A_channel_1':'blue',
+			'TCRG-A_channel_2':'green',
+			# 'TCRG-A_channel_4':'black',
+			# 'TCRG-A_channel_4_repeat':'black',
+			'TCRG-B_channel_1':'blue',
+			'TCRG-B_channel_2':'green',
+			'SCL_channel_1':'blue'
+	}
+regions_of_interest = {
+			'IGH-A_channel_1':[(310,360)],
+			'IGH-B_channel_1':[(250,295)],
+			'IGH-C_channel_2':[(100,170)],
+			'IGK-A_channel_1':[(120,160),(190,210),(260,300)],
+			'IGK-B_channel_1':[(210,250),(270,300),(350,390)],
+			'TCRB-A_channel_1':[(240,285)],
+			'TCRB-A_channel_2':[(240,285)],
+			'TCRB-B_channel_1':[(240,285)],
+			'TCRB-C_channel_1':[(170,210),(285,325)],
+			'TCRB-C_channel_2':[(170,210),(285,325)],
+			'TCRG-A_channel_1':[(175,195),(230,255)],
+			'TCRG-A_channel_2':[(145,175),(195,230)],
+			'TCRG-B_channel_1':[(110,140),(195,220)],
+			'TCRG-B_channel_2':[(80,110),(160,195)]
+	}
+
+debug = False
+
 def main():
 	owd = os.getcwd()	# original working directory
 	path = os.path.abspath(sys.argv[1])
@@ -390,9 +422,11 @@ def main():
 	# output_path = os.path.join(path, '/plots')
 	# if not os.path.exists(output_path): os.mkdir(output_path)
 	for case_name, case in cases.items():
+		# if '0084' in case_name:
 		print('Processing raw data for {}'.format(case_name))
 		case = gather_case_data(case, case_name, path)
 		case = size_standard(case)
+		case = baseline_correction(case)
 		case = pick_peak_one(case)
 		case = make_decay_curve(case)
 		case = local_southern(case)
