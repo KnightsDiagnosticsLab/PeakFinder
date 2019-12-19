@@ -36,6 +36,7 @@ def autoscale_y(ax,margin=0.1):
 		yd = line.get_ydata()
 		lo,hi = ax.get_xlim()
 		y_displayed = yd[((xd>lo) & (xd<hi))]
+		print('y_displayed = {}'.format(y_displayed))
 		h = np.max(y_displayed) - np.min(y_displayed)
 		bot = np.min(y_displayed)-margin*h
 		top = np.max(y_displayed)+margin*h
@@ -50,6 +51,16 @@ def autoscale_y(ax,margin=0.1):
 		if new_top > top: top = new_top
 
 	ax.set_ylim(bot,top)
+
+def autoscale_y_2(x_window_start, x_window_end, x_series, y_series):
+	window_indices = [i for i, v in x_series.items() if v > x_window_start and v < x_window_end]
+	y_max = y_series[window_indices].max()
+	y_top = y_max + 0.1 * abs(y_max)
+	if y_top < 200:
+		y_top = 200
+	y_min = y_series[window_indices].min()
+	y_bot = y_min - 0.1 * abs(y_min)
+	return y_bot, y_top
 
 def pretty_name(c,t):
 	if 'channel' in c:
@@ -84,6 +95,9 @@ def organize_files(path):
 		c.files = cd[cn]
 		c.ladder = {}
 		c.rox500 = []
+		c.peaks_to_annotate = {}
+		c.re_peaks_to_annotate = {}
+		c.re_df = {}
 	return cases
 
 class Case(object):
@@ -100,6 +114,20 @@ def gather_case_data(case, case_name, path):
 			df = pd.concat([df, df_t], axis=1, sort=False)
 	df.name = case_name
 	case.df = df
+	return case
+
+def reindex_case(case):
+	for ch in case.df.columns:
+		i_dict = {}
+		if 'channel' in ch and not ch.startswith('x_fitted'):
+			x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+			X = np.around(10 * case.df[x_col_name])
+			i_dict = {int(x): set() for x in X}
+			for i, x in X.items():
+				x = int(x)
+				i_dict[x].add(case.df[ch][i])
+			i_dict = {x:max(v) for x,v in i_dict.items() if x >= 0}
+			case.re_df[ch] = pd.Series(i_dict)
 	return case
 
 def local_southern(case):
@@ -128,27 +156,83 @@ def local_southern(case):
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return case
 
+def plot_case_2(case):
+	x_window_start = 75*10
+	x_window_end = 400*10
+
+	if use_timestamp:
+		multipage = case.name + '_' + timestr + '.pdf'
+	else:
+		multipage = case.name + '.pdf'
+
+	with PdfPages(multipage) as pdf:
+		has_repeat = [ch for ch in case.re_df.keys() if '_'.join([ch, 'repeat']) in case.re_df.keys() and ch in channels_of_interest.keys()]
+		no_repeat = [ch for ch in case.re_df.keys() if ch not in has_repeat]
+		for ch in has_repeat:
+			ch_repeat = '_'.join([ch, 'repeat'])
+
+			p, axs = plt.subplots(nrows=2, ncols=1)
+			p.subplots_adjust(hspace=0.5)
+			p.suptitle(case.name)
+
+			for i, c in enumerate([ch, ch_repeat]):
+				for x_start,x_end in regions_of_interest[c]:
+					axs[i].axvspan(x_start*10, x_end*10, facecolor='black', alpha=0.05)
+				df = case.re_df[c]
+				peaks_x = case.re_peaks_to_annotate[c]
+				axs[i].plot(df.iloc[peaks_x], 'o', color='black', fillstyle='none')
+				axs[i].plot(df, linewidth=0.25, color=channels_of_interest[c])
+				axs[i].set_title(c, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+				axs[i].set_xlim([x_window_start, x_window_end])
+				axs[i].set_ylabel('RFU', fontsize=6)
+				axs[i].set_xlabel('Fragment Size', fontsize=6)
+				axs[i].yaxis.set_tick_params(labelsize=6)
+				y_max = df[x_window_start:x_window_end].max()
+				y_top = y_max + 0.1 * abs(y_max)
+				if y_top < 200:
+					y_top = 200
+				y_min = df[x_window_start:x_window_end].min()
+				y_bot = y_min - 0.1 * abs(y_min)
+				axs[i].set_ylim(top=y_top, bottom=y_bot)
+
+			pdf.savefig()
+			plt.close(p)
+		print('Done making {}'.format(multipage))
+
+
 def plot_case(case):
 	x_window_start = 75
-	x_window_end = 450
-	# multipage = case.name + '_' + timestr + '.pdf'
-	multipage = case.name + '.pdf'
+	x_window_end = 400
+
+	if use_timestamp:
+		multipage = case.name + '_' + timestr + '.pdf'
+	else:
+		multipage = case.name + '.pdf'
+
 	with PdfPages(multipage) as pdf:
-		channels = {k:v for k,v in all_channels.items() if k in case.df.columns}
+		channels = {k:v for k,v in channels_of_interest.items() if k in case.df.columns}
 		for ch in channels.keys():
 			x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 			png_name = case.name + '_' + ch + '.png'
 			ch_repeat = '_'.join([ch, 'repeat'])
 			x_col_name_repeat = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch_repeat)
+
 			if 'channel_4' in ch:
 				num_rows = 1
 			elif ch_repeat in case.df.columns:
 				num_rows = 2
 			else:
 				num_rows = 1
+
 			p, axs = plt.subplots(nrows=num_rows, ncols=1)
 			p.subplots_adjust(hspace=0.5)
 			p.suptitle(case.name)
+
+			for x_start,x_end in regions_of_interest[ch]:
+				axs[0].axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+				axs[1].axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+
+
 			if 'channel_4' in ch and 'SCL' not in ch:
 				axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
 				axs.plot(case.ladder[ch], case.df[ch][case.ladder[ch]], 'x')
@@ -165,19 +249,33 @@ def plot_case(case):
 				axs.plot(case.df.index.tolist(), case.df[ch], linewidth=0.25, color=channels[ch])
 				axs.plot(case.df.index.tolist(), case.df['decay'], linewidth=0.25, color=c)
 			elif num_rows==2:
+				if ch in regions_of_interest.keys():
+					for x_start,x_end in regions_of_interest[ch]:
+						axs[0].axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+						axs[1].axvspan(x_start, x_end, facecolor='black', alpha=0.05)
+
+				axs[0].plot(case.df[x_col_name][case.peaks_to_annotate[ch]], case.df[ch][case.peaks_to_annotate[ch]], 'o', color='black', fillstyle='none')
 				axs[0].plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
-				axs[1].plot(case.df[x_col_name_repeat], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
 				axs[0].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+				axs[0].set_xlim([x_window_start, x_window_end])
+				axs[0].set_ylabel('RFU', fontsize=6)
+				axs[0].set_xlabel('Fragment Size', fontsize=6)
+				axs[0].yaxis.set_tick_params(labelsize=6)
+				y_bot, y_top = autoscale_y_2(x_window_start, x_window_end, case.df[x_col_name], case.df[ch])
+				axs[0].set_ylim(top=y_top, bottom=y_bot)
+
+				axs[1].plot(case.df[x_col_name_repeat][case.peaks_to_annotate[ch_repeat]], case.df[ch_repeat][case.peaks_to_annotate[ch_repeat]], 'o', color='black', fillstyle='none')
+				axs[1].plot(case.df[x_col_name_repeat], case.df[ch_repeat], linewidth=0.25, color=channels[ch])
 				axs[1].set_title(ch_repeat, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-				for ax in axs:
-					ax.set_xlim([x_window_start, x_window_end])
-					ax.set_ylabel('RFU', fontsize=6)
-					ax.set_xlabel('Fragment Size', fontsize=6)
-					ax.yaxis.set_tick_params(labelsize=6)
-					if ch in regions_of_interest.keys():
-						for x_start,x_end in regions_of_interest[ch]:
-							ax.axvspan(x_start, x_end, facecolor='black', alpha=0.05)
-					autoscale_y(ax)
+				axs[1].set_xlim([x_window_start, x_window_end])
+				axs[1].set_ylabel('RFU', fontsize=6)
+				axs[1].set_xlabel('Fragment Size', fontsize=6)
+				axs[1].yaxis.set_tick_params(labelsize=6)
+				y_bot, y_top = autoscale_y_2(x_window_start, x_window_end, case.df[x_col_name_repeat], case.df[ch_repeat])
+				axs[1].set_ylim(top=y_top, bottom=y_bot)
+
+				# autoscale_y(axs[0])
+				# autoscale_y(axs[1])
 			elif num_rows==1:
 				axs.plot(case.df[x_col_name], case.df[ch], linewidth=0.25, color=channels[ch])
 				axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
@@ -350,7 +448,7 @@ def size_standard(case, channel='channel_4'):
 def baseline_correction(case):
 	for ch in case.df.columns:
 		ch_repeat = '_'.join([ch, 'repeat'])
-		if ch in all_channels.keys() and 'SCL' not in ch:
+		if ch in channels_of_interest.keys() and 'SCL' not in ch:
 			label_name = '_'.join([case.name, ch])
 			if debug: print(label_name)
 			for i in range(0,3):
@@ -370,7 +468,7 @@ def baseline_correction(case):
 				case.df[ch_repeat] = case.df[ch_repeat] - spl_df
 	return case
 
-all_channels = {
+channels_of_interest = {
 			'IGH-A_channel_1':'blue',
 			'IGH-B_channel_1':'blue',
 			'IGH-C_channel_2':'green',
@@ -393,7 +491,22 @@ all_channels = {
 			# 'TCRG-A_channel_4_repeat':'black',
 			'TCRG-B_channel_1':'blue',
 			'TCRG-B_channel_2':'green',
-			'SCL_channel_1':'blue'
+			'SCL_channel_1':'blue',
+			'IGH-A_channel_1_repeat':'blue',
+			'IGH-B_channel_1_repeat':'blue',
+			'IGH-C_channel_2_repeat':'green',
+			'IGK-A_channel_1_repeat':'blue',
+			'IGK-B_channel_1_repeat':'blue',
+			'TCRB-A_channel_1_repeat':'blue',
+			'TCRB-A_channel_2_repeat':'green',
+			'TCRB-B_channel_1_repeat':'blue',
+			'TCRB-C_channel_1_repeat':'blue',
+			'TCRB-C_channel_2_repeat':'green',
+			'TCRG-A_channel_1_repeat':'blue',
+			'TCRG-A_channel_2_repeat':'green',
+			'TCRG-B_channel_1_repeat':'blue',
+			'TCRG-B_channel_2_repeat':'green',
+			'SCL_channel_1_repeat':'blue'
 	}
 regions_of_interest = {
 			'IGH-A_channel_1':[(310,360)],
@@ -409,10 +522,49 @@ regions_of_interest = {
 			'TCRG-A_channel_1':[(175,195),(230,255)],
 			'TCRG-A_channel_2':[(145,175),(195,230)],
 			'TCRG-B_channel_1':[(110,140),(195,220)],
-			'TCRG-B_channel_2':[(80,110),(160,195)]
+			'TCRG-B_channel_2':[(80,110),(160,195)],
+			'IGH-A_channel_1_repeat':[(310,360)],
+			'IGH-B_channel_1_repeat':[(250,295)],
+			'IGH-C_channel_2_repeat':[(100,170)],
+			'IGK-A_channel_1_repeat':[(120,160),(190,210),(260,300)],
+			'IGK-B_channel_1_repeat':[(210,250),(270,300),(350,390)],
+			'TCRB-A_channel_1_repeat':[(240,285)],
+			'TCRB-A_channel_2_repeat':[(240,285)],
+			'TCRB-B_channel_1_repeat':[(240,285)],
+			'TCRB-C_channel_1_repeat':[(170,210),(285,325)],
+			'TCRB-C_channel_2_repeat':[(170,210),(285,325)],
+			'TCRG-A_channel_1_repeat':[(175,195),(230,255)],
+			'TCRG-A_channel_2_repeat':[(145,175),(195,230)],
+			'TCRG-B_channel_1_repeat':[(110,140),(195,220)],
+			'TCRG-B_channel_2_repeat':[(80,110),(160,195)]
 	}
 
 debug = False
+use_timestamp = True
+
+def peaks_to_annotate(case):
+	for ch in case.df.columns:
+		# print('peaks_to_annotate {}'.format(ch))
+		peaks_x, _ = find_peaks(case.df[ch], height=600)
+		case.peaks_to_annotate[ch] = peaks_x[:]
+	return case
+
+def peaks_to_annotate_2(case):
+	peaks = set()
+	for ch, df in case.re_df.items():
+		if ch in regions_of_interest.keys():
+			# print('peaks_to_annotate {}'.format(ch))
+			peaks_x, _ = find_peaks(df, height=600)
+			peaks = []
+			for x_start, x_end in regions_of_interest[ch]:
+				peaks.extend([x for x in peaks_x if x >= 10*x_start and x <= 10*x_end])
+			# peaks = set(peaks)
+			# print(peaks_x)
+			# print(peaks_x2)
+			case.re_peaks_to_annotate[ch] = sorted(list(peaks))
+	# for ch, peaks in case.re_peaks_to_annotate.items():
+	# 	print(ch, peaks)
+	return case
 
 def main():
 	owd = os.getcwd()	# original working directory
@@ -430,7 +582,10 @@ def main():
 		case = pick_peak_one(case)
 		case = make_decay_curve(case)
 		case = local_southern(case)
-		plot_case(case)
+		case = reindex_case(case)
+		# case = peaks_to_annotate(case)
+		case = peaks_to_annotate_2(case)
+		plot_case_2(case)
 
 if __name__ == '__main__':
 	main()
