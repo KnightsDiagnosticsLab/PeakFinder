@@ -167,7 +167,9 @@ def plot_case_2(case):
 
 	with PdfPages(multipage) as pdf:
 		has_repeat = [ch for ch in case.re_df.keys() if '_'.join([ch, 'repeat']) in case.re_df.keys() and ch in channels_of_interest.keys()]
-		no_repeat = [ch for ch in case.re_df.keys() if ch not in has_repeat]
+		no_repeat = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and ch not in has_repeat]
+		scl = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and 'SCL' in ch]
+
 		for ch in has_repeat:
 			ch_repeat = '_'.join([ch, 'repeat'])
 
@@ -181,6 +183,8 @@ def plot_case_2(case):
 				df = case.re_df[c]
 				peaks_x = case.re_peaks_to_annotate[c]
 				axs[i].plot(df.iloc[peaks_x], 'o', color='black', fillstyle='none')
+				for x in peaks_x:
+					axs[i].annotate(str(x), xy=(x, 1.05 * df.iloc[x]))
 				axs[i].plot(df, linewidth=0.25, color=channels_of_interest[c])
 				axs[i].set_title(c, fontdict={'fontsize': 8, 'fontweight': 'medium'})
 				axs[i].set_xlim([x_window_start, x_window_end])
@@ -194,6 +198,26 @@ def plot_case_2(case):
 				y_min = df[x_window_start:x_window_end].min()
 				y_bot = y_min - 0.1 * abs(y_min)
 				axs[i].set_ylim(top=y_top, bottom=y_bot)
+
+			pdf.savefig()
+			plt.close(p)
+
+		for c in scl:
+
+			p, axs = plt.subplots(nrows=1, ncols=1)
+			p.subplots_adjust(hspace=0.5)
+			p.suptitle(case.name)
+
+			axs.set_title(c, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+			axs.set_ylabel('RFU', fontsize=6)
+			axs.set_xlabel('Fragment Size', fontsize=6)
+			axs.yaxis.set_tick_params(labelsize=6)
+
+			if case.ladder_success: clr = 'green'
+			else: clr = 'red'
+			axs.plot(case.ladder_SCL, case.df[c][case.ladder_SCL], 'o', fillstyle='none', color=clr)
+			axs.plot(case.df[c], linewidth=0.25, color=channels_of_interest[c])
+			axs.plot(case.df['decay'], linewidth=0.25, color=clr)
 
 			pdf.savefig()
 			plt.close(p)
@@ -543,27 +567,14 @@ debug = False
 use_timestamp = True
 
 def peaks_to_annotate(case):
-	for ch in case.df.columns:
-		# print('peaks_to_annotate {}'.format(ch))
-		peaks_x, _ = find_peaks(case.df[ch], height=600)
-		case.peaks_to_annotate[ch] = peaks_x[:]
-	return case
-
-def peaks_to_annotate_2(case):
 	peaks = set()
 	for ch, df in case.re_df.items():
 		if ch in regions_of_interest.keys():
-			# print('peaks_to_annotate {}'.format(ch))
 			peaks_x, _ = find_peaks(df, height=600)
 			peaks = []
 			for x_start, x_end in regions_of_interest[ch]:
 				peaks.extend([x for x in peaks_x if x >= 10*x_start and x <= 10*x_end])
-			# peaks = set(peaks)
-			# print(peaks_x)
-			# print(peaks_x2)
 			case.re_peaks_to_annotate[ch] = sorted(list(peaks))
-	# for ch, peaks in case.re_peaks_to_annotate.items():
-	# 	print(ch, peaks)
 	return case
 
 def main():
@@ -583,8 +594,7 @@ def main():
 		case = make_decay_curve(case)
 		case = local_southern(case)
 		case = reindex_case(case)
-		# case = peaks_to_annotate(case)
-		case = peaks_to_annotate_2(case)
+		case = peaks_to_annotate(case)
 		plot_case_2(case)
 
 if __name__ == '__main__':
