@@ -491,7 +491,7 @@ def peaks_to_annotate(case):
 			case.re_peaks_to_annotate[ch] = sorted(list(peaks))
 	return case
 
-def plot_case(case, show_size_standard=False):
+def plot_case(case, show_size_standard=False, w=1000, h=300):
 	silence(FIXED_SIZING_MODE, True)
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	output_file(case.name + '.html')
@@ -500,10 +500,10 @@ def plot_case(case, show_size_standard=False):
 		if 'SCL' in ch:
 			x = case.df[ch].index.to_list()
 			y = case.df[ch].to_list()
-			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=1000, height=300, x_range=(1000, max(x)), tooltips=TOOLTIPS)
+			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
 			p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
 		else:
-			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=1000, height=300, x_range=(75,400), tooltips=TOOLTIPS)
+			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
 			x = [x /10.0 for x in case.re_df[ch].index.to_list()]
 			y = case.re_df[ch].to_list()
 			if ch in regions_of_interest.keys():
@@ -523,10 +523,11 @@ def plot_case(case, show_size_standard=False):
 			y = case.df[ch_4].to_list()
 			x_ladder = case.ladder[ch_4]
 			y_ladder = case.df[ch_4][x_ladder]
-			p = figure(title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=1000, height=150, x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
+			p = figure(title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
 			p.line(x, y, line_width=0.5, color='red')
 			p.ygrid.visible = False
 			p.x(x_ladder, y_ladder)
+			plot_dict[ch_4] = p
 
 	for ch, p in plot_dict.items():
 		ch_repeat = ch + '_repeat'
@@ -561,7 +562,7 @@ def main():
 		case = reindex_case(case)
 		case = peaks_to_annotate(case)
 		# plot_case_pdf(case)
-		plot_case(case)
+		plot_case(case, show_size_standard=True, w=1100, h=350)
 
 if __name__ == '__main__':
 	main()
