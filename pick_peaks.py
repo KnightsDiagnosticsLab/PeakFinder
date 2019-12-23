@@ -19,7 +19,7 @@ import re
 from outliers import smirnov_grubbs as grubbs
 
 from bokeh.io import output_file, show, save
-from bokeh.layouts import gridplot
+from bokeh.layouts import gridplot, column
 from bokeh.plotting import figure
 from bokeh.models import BoxAnnotation
 from bokeh.core.validation import silence
@@ -437,7 +437,7 @@ channels_of_interest = {
 			# 'TCRG-A_channel_4_repeat':'black',
 			'TCRG-B_channel_1':'blue',
 			'TCRG-B_channel_2':'green',
-			'SCL_channel_1':'gray',
+			'SCL_channel_1':'black',
 			'IGH-A_channel_1_repeat':'blue',
 			'IGH-B_channel_1_repeat':'blue',
 			'IGH-C_channel_2_repeat':'green',
@@ -452,7 +452,7 @@ channels_of_interest = {
 			'TCRG-A_channel_2_repeat':'green',
 			'TCRG-B_channel_1_repeat':'blue',
 			'TCRG-B_channel_2_repeat':'green',
-			'SCL_channel_1_repeat':'gray'
+			'SCL_channel_1_repeat':'black'
 	}
 regions_of_interest = {
 			'IGH-A_channel_1':[(310,360)],
@@ -503,27 +503,25 @@ def plot_with_bokeh(case, show_size_standard=False):
 	silence(FIXED_SIZING_MODE, True)
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	output_file(case.name + '.html')
-	plot_list = []
+	plot_dict = {}
 	for ch in sorted(case.re_df.keys()):
 		if 'SCL' in ch:
-			x = [x for x in case.df[ch].index.to_list()]
+			x = case.df[ch].index.to_list()
 			y = case.df[ch].to_list()
 			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=1000, height=300, x_range=(1000, max(x)), tooltips=TOOLTIPS)
 			p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
 		else:
 			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=1000, height=300, x_range=(75,400), tooltips=TOOLTIPS)
+			x = [x /10.0 for x in case.re_df[ch].index.to_list()]
+			y = case.re_df[ch].to_list()
 			if ch in regions_of_interest.keys():
 				for x_left, x_right in regions_of_interest[ch]:
 					roi = BoxAnnotation(left=x_left, right=x_right, fill_color='black', fill_alpha=0.05)
 					p.add_layout(roi)
-			x = [x /10.0 for x in case.re_df[ch].index.to_list()]
-			y = case.re_df[ch].to_list()
+
 			p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
 
-		if 'SCL' in ch:
-			plot_list.insert(0,p)
-		else:
-			plot_list.append(p)
+		plot_dict[ch] = p
 
 		# append size standard
 		if show_size_standard and 'SCL' not in ch:
@@ -533,16 +531,22 @@ def plot_with_bokeh(case, show_size_standard=False):
 			y = case.df[ch_4].to_list()
 			x_ladder = case.ladder[ch_4]
 			y_ladder = case.df[ch_4][x_ladder]
-			# print(x_ladder)
-			# print(case.df[ch_4].index)
 			p = figure(title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=1000, height=150, x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
 			p.line(x, y, line_width=0.5, color='red')
 			p.ygrid.visible = False
 			p.x(x_ladder, y_ladder)
-			# p.line(case.df[ch_4], line_width=0.5, color='red')
-			plot_list.append(p)
 
-	grid = gridplot(plot_list, ncols=1, sizing_mode='fixed', toolbar_location='left')
+	for ch, p in plot_dict.items():
+		ch_repeat = ch + '_repeat'
+		if ch_repeat in plot_dict.keys():
+			p.x_range = plot_dict[ch_repeat].x_range
+			p.y_range = plot_dict[ch_repeat].y_range
+
+	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
+	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
+	plot_keys = [*scl_keys, *plot_keys]
+
+	grid = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
 	show(grid)
 	save(grid)
 
