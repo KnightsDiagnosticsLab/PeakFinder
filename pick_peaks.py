@@ -165,7 +165,7 @@ def local_southern(case, order=2):
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return case
 
-def plot_case(case):
+def plot_case_pdf(case):
 	x_window_start = 75*10
 	x_window_end = 400*10
 
@@ -422,19 +422,11 @@ channels_of_interest = {
 			'IGK-B_channel_1':'blue',
 			'TCRB-A_channel_1':'blue',
 			'TCRB-A_channel_2':'green',
-			# 'TCRB-A_channel_4':'black',
-			# 'TCRB-A_channel_4_repeat':'black',
-			# 'TCRB-B_channel_4':'black',
-			# 'TCRB-B_channel_4_repeat':'black',
 			'TCRB-B_channel_1':'blue',
-			# 'TCRB-B_channel_4':'black',
-			# 'TCRB-B_channel_4_repeat':'black',
 			'TCRB-C_channel_1':'blue',
 			'TCRB-C_channel_2':'green',
 			'TCRG-A_channel_1':'blue',
 			'TCRG-A_channel_2':'green',
-			# 'TCRG-A_channel_4':'black',
-			# 'TCRG-A_channel_4_repeat':'black',
 			'TCRG-B_channel_1':'blue',
 			'TCRG-B_channel_2':'green',
 			'SCL_channel_1':'black',
@@ -499,7 +491,7 @@ def peaks_to_annotate(case):
 			case.re_peaks_to_annotate[ch] = sorted(list(peaks))
 	return case
 
-def plot_with_bokeh(case, show_size_standard=False):
+def plot_case(case, show_size_standard=False):
 	silence(FIXED_SIZING_MODE, True)
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	output_file(case.name + '.html')
@@ -568,8 +560,8 @@ def main():
 		case = local_southern(case)
 		case = reindex_case(case)
 		case = peaks_to_annotate(case)
-		# plot_case(case)
-		plot_with_bokeh(case)
+		# plot_case_pdf(case)
+		plot_case(case)
 
 if __name__ == '__main__':
 	main()
