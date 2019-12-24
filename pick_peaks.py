@@ -21,7 +21,7 @@ from outliers import smirnov_grubbs as grubbs
 from bokeh.io import output_file, show, save
 from bokeh.layouts import gridplot, column
 from bokeh.plotting import figure
-from bokeh.models import BoxAnnotation, Label, Range1d
+from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, WheelPanTool
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 
@@ -443,91 +443,118 @@ regions_of_interest = {
 	}
 
 def index_of_peaks_to_annotate(case):
-	peaks = set()
 	for ch in case.df.columns:
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		if ch in regions_of_interest.keys():
-			peaks_x, _ = find_peaks(case.df[ch], height=600, distance=20)
-			peaks = []
+			peaks_x, _ = find_peaks(case.df[ch], height=600, prominence=100)
+			peaks_in_roi = []
 			for x_start, x_end in regions_of_interest[ch]:
-				peaks.extend([x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end])
-			case.index_of_peaks_to_annotate[ch] = sorted(list(peaks))
+				peaks_in_roi.extend([x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end])
+			peaks_y = case.df[ch][peaks_in_roi].to_list()
+			peaks_in_roi = [x for y,x in sorted(zip(peaks_y, peaks_in_roi), reverse=True)]
+			if len(peaks_in_roi) > 5:
+				peaks_in_roi = peaks_in_roi[0:5]
+
+
+			case.index_of_peaks_to_annotate[ch] = peaks_in_roi[:]
 	return case
 
-def plot_case(case, show_size_standard=False, w=1000, h=300):
-	silence(FIXED_SIZING_MODE, True)
-	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-	output_file(case.name + '.html')
-	plot_dict = {}
-	for ch in sorted(case.df.columns):
-		if ch in channels_of_interest.keys():
-			label_name = case.name + '_' + ch
-			x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
-			if 'SCL' in ch:
-				x = case.df[ch].index.to_list()
-				y = case.df[ch].to_list()
-				p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
-				p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
-			else:	# plot channels of interest, including repeats.
-				p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
-				x = case.df[x_col_name].to_list()
-				y = case.df[ch].to_list()
-				p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
-				if ch in regions_of_interest.keys():
-					# mark regions in gray
-					for x_left, x_right in regions_of_interest[ch]:
-						roi = BoxAnnotation(left=x_left, right=x_right, fill_color='black', fill_alpha=0.05)
-						p.add_layout(roi)
-					# annotate peaks
-					peaks_index = case.index_of_peaks_to_annotate[ch]
-					x_peaks = case.df[x_col_name][peaks_index].to_list()
-					y_peaks = case.df[ch][peaks_index].to_list()
-					if len(y_peaks) > 0:
-						p.y_range.end = 1.3*max(y_peaks)
-					else:
-						p.y_range.end = 1000
-					for x,y in zip(x_peaks, y_peaks):
-						mytext = Label(angle=1, x=x, y=int(y), text='{:.1f}'.format(x), x_offset=0, y_offset=2, text_font_size='8pt')
-						p.add_layout(mytext)
-			plot_dict[ch] = p
+def plot_scl(case, ch, plot_dict, w, h):
+	if ch in channels_of_interest.keys() and 'SCL' in ch:
+		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+		x = case.df[ch].index.to_list()
+		y = case.df[ch].to_list()
+		p = figure(tools='pan,wheel_zoom,reset',title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
+		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
+		plot_dict[ch] = p
+	return plot_dict
 
-			# append size standard
-			if show_size_standard and 'SCL' not in ch:
-				ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
-				case.df[ch_4].index.rename('x')
-				x = case.df[ch_4].index.to_list()
-				y = case.df[ch_4].to_list()
-				x_ladder = case.ladder[ch_4]
-				y_ladder = case.df[ch_4][x_ladder].to_list()
-				p = figure(title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
-				p.line(x, y, line_width=0.5, color='red')
-				p.ygrid.visible = False
-				p.x(x_ladder, y_ladder)
-				# print('x={}, y={}'.format(x_ladder, y_ladder))
-				for x,y,label in zip(x_ladder, y_ladder, case.rox500):
-					mytext = Label(angle=1, x=x, y=y, text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
-					p.add_layout(mytext)
-				plot_dict[ch_4] = p
+def plot_channels_of_interest(case, ch, plot_dict, w, h):
+	if ch in channels_of_interest.keys() and 'SCL' not in ch:
+		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+		p = figure(tools='pan,wheel_zoom,reset',title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
+		x = case.df[x_col_name].to_list()
+		y = case.df[ch].to_list()
+		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
+		if ch in regions_of_interest.keys():
+			# mark regions in gray
+			for x_left, x_right in regions_of_interest[ch]:
+				roi = BoxAnnotation(left=x_left, right=x_right, fill_color='black', fill_alpha=0.05)
+				p.add_layout(roi)
+		plot_dict[ch] = p
+	return plot_dict
 
+def plot_peaks_of_interest(case, ch, plot_dict, w, h):
+	if ch in regions_of_interest.keys():
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+		p = plot_dict[ch]
+		peaks_index = case.index_of_peaks_to_annotate[ch]
+		x_peaks = case.df[x_col_name][peaks_index].to_list()
+		y_peaks = case.df[ch][peaks_index].to_list()
+		if len(y_peaks) > 0:
+			p.y_range.end = 1.3*max(y_peaks)
+		else:
+			p.y_range.end = 1000
+		for x,y in zip(x_peaks, y_peaks):
+			mytext = Label(angle=1, x=x, y=int(y), text='{:.1f}'.format(x), x_offset=0, y_offset=2, text_font_size='8pt')
+			p.add_layout(mytext)
+	return plot_dict
+
+def plot_size_standard(case, ch, plot_dict, w, h):
+	if ch in channels_of_interest.keys() and 'SCL' not in ch:
+		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+		ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
+		case.df[ch_4].index.rename('x')
+		x = case.df[ch_4].index.to_list()
+		y = case.df[ch_4].to_list()
+		x_ladder = case.ladder[ch_4]
+		y_ladder = case.df[ch_4][x_ladder].to_list()
+		p = figure(tools='pan,wheel_zoom,reset',title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
+		p.line(x, y, line_width=0.5, color='red')
+		p.ygrid.visible = False
+		p.x(x_ladder, y_ladder)
+		# print('x={}, y={}'.format(x_ladder, y_ladder))
+		for x,y,label in zip(x_ladder, y_ladder, case.rox500):
+			mytext = Label(angle=1, x=x, y=y, text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
+			p.add_layout(mytext)
+		plot_dict[ch_4] = p
+	return plot_dict
+
+def sync_axes(plot_dict):
 	for ch, p in plot_dict.items():
 		ch_repeat = ch + '_repeat'
 		if ch_repeat in plot_dict.keys():
-			# print('ch = {}, ch_repeat = {}'.format(ch, ch_repeat))
-
 			if p.y_range.end >= plot_dict[ch_repeat].y_range.end:
 				plot_dict[ch_repeat].x_range = p.x_range
 				plot_dict[ch_repeat].y_range = p.y_range
 			else:
 				p.x_range = plot_dict[ch_repeat].x_range
 				p.y_range = plot_dict[ch_repeat].y_range
+	return plot_dict
+
+def plot_case(case, w=1000, h=300):
+	# Need to break this in to sub functions. It's hard to follow like this.
+	silence(FIXED_SIZING_MODE, True)
+	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+	output_file(case.name + '.html')
+	plot_dict = {}
+	for ch in sorted(case.df.columns):
+		plot_dict = plot_scl(case, ch, plot_dict, w, h)
+		plot_dict = plot_channels_of_interest(case, ch, plot_dict, w, h)
+		plot_dict = plot_size_standard(case, ch, plot_dict, w, h)
+		plot_peaks_of_interest(case, ch, plot_dict, w, h)
+
+	plot_dict = sync_axes(plot_dict)
 
 	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
 	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
 	plot_keys = [*scl_keys, *plot_keys]
+	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
 
-	grid = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
-	show(grid)
-	save(grid)
+	show(plots)
+	save(plots)
 
 # def reindex_case(case):
 # 	for ch in case.df.columns:
@@ -569,7 +596,7 @@ def main():
 		# case = reindex_case(case)
 		case = index_of_peaks_to_annotate(case)
 		# plot_case_pdf(case)
-		plot_case(case, show_size_standard=True, w=1100, h=350)
+		plot_case(case, w=1100, h=350)
 
 if __name__ == '__main__':
 	main()
