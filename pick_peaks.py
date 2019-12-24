@@ -21,7 +21,7 @@ from outliers import smirnov_grubbs as grubbs
 from bokeh.io import output_file, show, save
 from bokeh.layouts import gridplot, column
 from bokeh.plotting import figure
-from bokeh.models import BoxAnnotation
+from bokeh.models import BoxAnnotation, Label, Range1d
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 
@@ -103,8 +103,8 @@ def organize_files(path):
 		c.files = cd[cn]
 		c.ladder = {}
 		c.rox500 = []
-		c.peaks_to_annotate = {}
-		c.re_peaks_to_annotate = {}
+		c.index_of_peaks_to_annotate = {}
+		c.index_of_peaks_to_annotate = {}
 		c.re_df = {}
 	return cases
 
@@ -122,21 +122,6 @@ def gather_case_data(case, case_name, path):
 			df = pd.concat([df, df_t], axis=1, sort=False)
 	df.name = case_name
 	case.df = df
-	return case
-
-def reindex_case(case):
-	for ch in case.df.columns:
-		if ch in channels_of_interest.keys():
-			i_dict = {}
-			if 'channel' in ch and not ch.startswith('x_fitted'):
-				x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
-				X = np.around(10 * case.df[x_col_name])
-				i_dict = {int(x): set() for x in X}
-				for i, x in X.items():
-					x = int(x)
-					i_dict[x].add(case.df[ch][i])
-				i_dict = {x:max(v) for x,v in i_dict.items() if x >= 0}
-				case.re_df[ch] = pd.Series(i_dict)
 	return case
 
 def local_southern(case, order=2):
@@ -165,94 +150,94 @@ def local_southern(case, order=2):
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return case
 
-def plot_case_pdf(case):
-	x_window_start = 75*10
-	x_window_end = 400*10
+# def plot_case_pdf(case):
+# 	x_window_start = 75*10
+# 	x_window_end = 400*10
 
-	if use_timestamp:
-		multipage = case.name + '_' + timestr + '.pdf'
-	else:
-		multipage = case.name + '.pdf'
+# 	if use_timestamp:
+# 		multipage = case.name + '_' + timestr + '.pdf'
+# 	else:
+# 		multipage = case.name + '.pdf'
 
-	with PdfPages(multipage) as pdf:
-		has_repeat = [ch for ch in case.re_df.keys() if '_'.join([ch, 'repeat']) in case.re_df.keys() and ch in channels_of_interest.keys()]
-		# no_repeat = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and ch not in has_repeat]
-		scl = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and 'SCL' in ch]
+# 	with PdfPages(multipage) as pdf:
+# 		has_repeat = [ch for ch in case.re_df.keys() if '_'.join([ch, 'repeat']) in case.re_df.keys() and ch in channels_of_interest.keys()]
+# 		# no_repeat = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and ch not in has_repeat]
+# 		scl = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and 'SCL' in ch]
 
-		for channel in has_repeat:
-			channel_repeat = '_'.join([channel, 'repeat'])
+# 		for channel in has_repeat:
+# 			channel_repeat = '_'.join([channel, 'repeat'])
 
-			p, axs = plt.subplots(nrows=2, ncols=1)
-			p.subplots_adjust(hspace=0.5)
-			p.suptitle(case.name)
+# 			p, axs = plt.subplots(nrows=2, ncols=1)
+# 			p.subplots_adjust(hspace=0.5)
+# 			p.suptitle(case.name)
 
-			for i, ch in enumerate([channel, channel_repeat]):
-				for x_start,x_end in regions_of_interest[ch]:
-					axs[i].axvspan(x_start*10, x_end*10, facecolor='black', alpha=0.05)
-				df = case.re_df[ch]
-				peaks_x = case.re_peaks_to_annotate[ch]
-				axs[i].plot(df.iloc[peaks_x], 'o', color='black', fillstyle='none')
-				# texts = [axs[i].text(x, 1.05 * df.iloc[x], str(x)) for x in peaks_x]
-				for x in peaks_x:
-					axs[i].annotate(str(x), xy=(x, 1.05 * df.iloc[x]))
-				axs[i].plot(df, linewidth=0.25, color=channels_of_interest[ch])
-				axs[i].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-				axs[i].set_xlim([x_window_start, x_window_end])
-				axs[i].set_ylabel('RFU', fontsize=6)
-				axs[i].set_xlabel('Fragment Size', fontsize=6)
-				axs[i].yaxis.set_tick_params(labelsize=6)
-				y_max = df[x_window_start:x_window_end].max()
-				y_top = y_max + 0.1 * abs(y_max)
-				if y_top < 200:
-					y_top = 200
-				y_min = df[x_window_start:x_window_end].min()
-				y_bot = y_min - 0.1 * abs(y_min)
-				axs[i].set_ylim(top=y_top, bottom=y_bot)
+# 			for i, ch in enumerate([channel, channel_repeat]):
+# 				for x_start,x_end in regions_of_interest[ch]:
+# 					axs[i].axvspan(x_start*10, x_end*10, facecolor='black', alpha=0.05)
+# 				df = case.re_df[ch]
+# 				peaks_x = case.index_of_peaks_to_annotate[ch]
+# 				axs[i].plot(df.iloc[peaks_x], 'o', color='black', fillstyle='none')
+# 				# texts = [axs[i].text(x, 1.05 * df.iloc[x], str(x)) for x in peaks_x]
+# 				for x in peaks_x:
+# 					axs[i].annotate(str(x), xy=(x, 1.05 * df.iloc[x]))
+# 				axs[i].plot(df, linewidth=0.25, color=channels_of_interest[ch])
+# 				axs[i].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+# 				axs[i].set_xlim([x_window_start, x_window_end])
+# 				axs[i].set_ylabel('RFU', fontsize=6)
+# 				axs[i].set_xlabel('Fragment Size', fontsize=6)
+# 				axs[i].yaxis.set_tick_params(labelsize=6)
+# 				y_max = df[x_window_start:x_window_end].max()
+# 				y_top = y_max + 0.1 * abs(y_max)
+# 				if y_top < 200:
+# 					y_top = 200
+# 				y_min = df[x_window_start:x_window_end].min()
+# 				y_bot = y_min - 0.1 * abs(y_min)
+# 				axs[i].set_ylim(top=y_top, bottom=y_bot)
 
-			pdf.savefig()
-			plt.close(p)
+# 			pdf.savefig()
+# 			plt.close(p)
 
-			ch_4 = re.sub(r'channel_\d', 'channel_4', channel)
-			ch_repeat_4 = re.sub(r'channel_\d', 'channel_4', channel_repeat)
+# 			ch_4 = re.sub(r'channel_\d', 'channel_4', channel)
+# 			ch_repeat_4 = re.sub(r'channel_\d', 'channel_4', channel_repeat)
 
-			p, axs = plt.subplots(nrows=2, ncols=1)
-			p.subplots_adjust(hspace=0.5)
-			p.suptitle(case.name)
+# 			p, axs = plt.subplots(nrows=2, ncols=1)
+# 			p.subplots_adjust(hspace=0.5)
+# 			p.suptitle(case.name)
 
-			for i, ch in enumerate([ch_4, ch_repeat_4]):
-				df = case.df[ch]
-				axs[i].plot(df, linewidth=0.25)
-				axs[i].plot(df[case.ladder[ch]], 'x', color='red')
-				axs[i].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-				axs[i].set_ylabel('RFU', fontsize=6)
-				axs[i].set_xlabel('Fragment Size', fontsize=6)
-				axs[i].yaxis.set_tick_params(labelsize=6)
-				axs[i].set_ylim(top=2000)
-				axs[i].set_xlim(left=1000)
+# 			for i, ch in enumerate([ch_4, ch_repeat_4]):
+# 				df = case.df[ch]
+# 				axs[i].plot(df, linewidth=0.25)
+# 				axs[i].plot(df[case.ladder[ch]], 'x', color='red')
+# 				axs[i].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+# 				axs[i].set_ylabel('RFU', fontsize=6)
+# 				axs[i].set_xlabel('Fragment Size', fontsize=6)
+# 				axs[i].yaxis.set_tick_params(labelsize=6)
+# 				axs[i].set_ylim(top=2000)
+# 				axs[i].set_xlim(left=1000)
 
-			pdf.savefig()
-			plt.close(p)
+# 			pdf.savefig()
+# 			plt.close(p)
 
-		for ch in scl:
+# 		for ch in scl:
 
-			p, axs = plt.subplots(nrows=1, ncols=1)
-			p.subplots_adjust(hspace=0.5)
-			p.suptitle(case.name)
+# 			p, axs = plt.subplots(nrows=1, ncols=1)
+# 			p.subplots_adjust(hspace=0.5)
+# 			p.suptitle(case.name)
 
-			axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-			axs.set_ylabel('RFU', fontsize=6)
-			axs.set_xlabel('Fragment Size', fontsize=6)
-			axs.yaxis.set_tick_params(labelsize=6)
+# 			axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
+# 			axs.set_ylabel('RFU', fontsize=6)
+# 			axs.set_xlabel('Fragment Size', fontsize=6)
+# 			axs.yaxis.set_tick_params(labelsize=6)
 
-			if case.ladder_success: clr = 'green'
-			else: clr = 'red'
-			axs.plot(case.ladder_SCL, case.df[ch][case.ladder_SCL], 'o', fillstyle='none', color=clr)
-			axs.plot(case.df[ch], linewidth=0.25, color=channels_of_interest[ch])
-			axs.plot(case.df['decay'], linewidth=0.25, color=clr)
+# 			if case.ladder_success: clr = 'green'
+# 			else: clr = 'red'
+# 			axs.plot(case.ladder_SCL, case.df[ch][case.ladder_SCL], 'o', fillstyle='none', color=clr)
+# 			axs.plot(case.df[ch], linewidth=0.25, color=channels_of_interest[ch])
+# 			axs.plot(case.df['decay'], linewidth=0.25, color=clr)
 
-			pdf.savefig()
-			plt.close(p)
-		print('Done making {}'.format(multipage))
+# 			pdf.savefig()
+# 			plt.close(p)
+# 		print('Done making {}'.format(multipage))
 
 def pick_peak_one(case):
 	case.ladder_success = False
@@ -269,9 +254,6 @@ def pick_peak_one(case):
 		peaks_x, _ = find_peaks(scldf.where(mask, 0), distance=min_dist)
 		case.peaks = [(x, scldf[x]) for x in sorted(peaks_x, reverse=False)]
 	else:
-		# print(case.name)
-		# print(mask.size)
-		# print(scldf.size)
 		print('\tSkipping {} due to size mismatch, likely due to multiple files being added to the same column in the case DataFrame column'.format(case.name))
 		for f in case.files['SCL']:
 			print('\t\t{}'.format(f))
@@ -355,15 +337,7 @@ def reduce_choices(df, label_name):
 	std2 = [(x1,x2) for x1, x2 in zip(std2_below, std2_above)]
 	peaks_x, _ = find_peaks(df, height=[std2_below, std2_above], prominence=20, width=2)
 	choices_x = [x for x in peaks_x if x > tallest[0]]
-	# print('choices_x length = {}'.format(len(choices_x)))
-	# print('choices_y = {}'.format(choices_y))
-	# print('choices_y_grubbs = {}'.format(choices_y_grubbs))
-	# if len(choices_y) > len(choices_y_grubbs):
-	# 	print(label_name)
-	# 	print('choices_y = {}'.format(choices_y))
-	# 	print('choices_y_grubbs = {}'.format(choices_y_grubbs))
 
-	# print('std = {}'.format(std))
 	if len(choices_x) > 20:
 		p, axs = plt.subplots(nrows=1, ncols=1)
 		axs.plot(df[choices_x], 'o', fillstyle='none')
@@ -403,15 +377,6 @@ def baseline_correction(case):
 				spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
 				spl_df = pd.Series(spl(case.df.index.tolist()))
 				case.df[ch] = case.df[ch] - spl_df
-		# if ch_repeat in case.df.columns and ch_repeat in channels_of_interest.keys() and 'SCL' not in ch_repeat:
-		# 	label_name = '_'.join([case.name, ch_repeat])
-		# 	if debug: print(label_name)
-		# 	for i in range(0,3):
-		# 		_, prop = find_peaks(case.df[ch_repeat], prominence=1, distance=10)
-		# 		bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
-		# 		spl = InterpolatedUnivariateSpline(bases, case.df[ch_repeat][bases])
-		# 		spl_df = pd.Series(spl(case.df.index.tolist()))
-		# 		case.df[ch_repeat] = case.df[ch_repeat] - spl_df
 	return case
 
 channels_of_interest = {
@@ -477,18 +442,16 @@ regions_of_interest = {
 			'TCRG-B_channel_2_repeat':[(80,110),(160,195)]
 	}
 
-debug = False
-use_timestamp = True
-
-def peaks_to_annotate(case):
+def index_of_peaks_to_annotate(case):
 	peaks = set()
-	for ch, df in case.re_df.items():
+	for ch in case.df.columns:
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		if ch in regions_of_interest.keys():
-			peaks_x, _ = find_peaks(df, height=600)
+			peaks_x, _ = find_peaks(case.df[ch], height=600, distance=20)
 			peaks = []
 			for x_start, x_end in regions_of_interest[ch]:
-				peaks.extend([x for x in peaks_x if x >= 10*x_start and x <= 10*x_end])
-			case.re_peaks_to_annotate[ch] = sorted(list(peaks))
+				peaks.extend([x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end])
+			case.index_of_peaks_to_annotate[ch] = sorted(list(peaks))
 	return case
 
 def plot_case(case, show_size_standard=False, w=1000, h=300):
@@ -496,44 +459,67 @@ def plot_case(case, show_size_standard=False, w=1000, h=300):
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	output_file(case.name + '.html')
 	plot_dict = {}
-	for ch in sorted(case.re_df.keys()):
-		if 'SCL' in ch:
-			x = case.df[ch].index.to_list()
-			y = case.df[ch].to_list()
-			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
-			p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
-		else:
-			p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
-			x = [x /10.0 for x in case.re_df[ch].index.to_list()]
-			y = case.re_df[ch].to_list()
-			if ch in regions_of_interest.keys():
-				for x_left, x_right in regions_of_interest[ch]:
-					roi = BoxAnnotation(left=x_left, right=x_right, fill_color='black', fill_alpha=0.05)
-					p.add_layout(roi)
+	for ch in sorted(case.df.columns):
+		if ch in channels_of_interest.keys():
+			label_name = case.name + '_' + ch
+			x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+			if 'SCL' in ch:
+				x = case.df[ch].index.to_list()
+				y = case.df[ch].to_list()
+				p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
+				p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
+			else:	# plot channels of interest, including repeats.
+				p = figure(title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
+				x = case.df[x_col_name].to_list()
+				y = case.df[ch].to_list()
+				p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
+				if ch in regions_of_interest.keys():
+					# mark regions in gray
+					for x_left, x_right in regions_of_interest[ch]:
+						roi = BoxAnnotation(left=x_left, right=x_right, fill_color='black', fill_alpha=0.05)
+						p.add_layout(roi)
+					# annotate peaks
+					peaks_index = case.index_of_peaks_to_annotate[ch]
+					x_peaks = case.df[x_col_name][peaks_index].to_list()
+					y_peaks = case.df[ch][peaks_index].to_list()
+					if len(y_peaks) > 0:
+						p.y_range.end = 1.3*max(y_peaks)
+					else:
+						p.y_range.end = 1000
+					for x,y in zip(x_peaks, y_peaks):
+						mytext = Label(angle=1, x=x, y=int(y), text='{:.1f}'.format(x), x_offset=0, y_offset=2, text_font_size='8pt')
+						p.add_layout(mytext)
+			plot_dict[ch] = p
 
-			p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
-
-		plot_dict[ch] = p
-
-		# append size standard
-		if show_size_standard and 'SCL' not in ch:
-			ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
-			case.df[ch_4].index.rename('x')
-			x = case.df[ch_4].index.to_list()
-			y = case.df[ch_4].to_list()
-			x_ladder = case.ladder[ch_4]
-			y_ladder = case.df[ch_4][x_ladder]
-			p = figure(title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
-			p.line(x, y, line_width=0.5, color='red')
-			p.ygrid.visible = False
-			p.x(x_ladder, y_ladder)
-			plot_dict[ch_4] = p
+			# append size standard
+			if show_size_standard and 'SCL' not in ch:
+				ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
+				case.df[ch_4].index.rename('x')
+				x = case.df[ch_4].index.to_list()
+				y = case.df[ch_4].to_list()
+				x_ladder = case.ladder[ch_4]
+				y_ladder = case.df[ch_4][x_ladder].to_list()
+				p = figure(title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
+				p.line(x, y, line_width=0.5, color='red')
+				p.ygrid.visible = False
+				p.x(x_ladder, y_ladder)
+				# print('x={}, y={}'.format(x_ladder, y_ladder))
+				for x,y,label in zip(x_ladder, y_ladder, case.rox500):
+					mytext = Label(angle=1, x=x, y=y, text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
+					p.add_layout(mytext)
+				plot_dict[ch_4] = p
 
 	for ch, p in plot_dict.items():
 		ch_repeat = ch + '_repeat'
 		if ch_repeat in plot_dict.keys():
-			p.x_range = plot_dict[ch_repeat].x_range
-			p.y_range = plot_dict[ch_repeat].y_range
+			# print('ch = {}, ch_repeat = {}'.format(ch, ch_repeat))
+
+			if p.y_range.end >= plot_dict[ch_repeat].y_range.end:
+				plot_dict[ch_repeat].x_range = p.x_range
+				plot_dict[ch_repeat].y_range = p.y_range
+			else:
+				p.x_range = plot_dict[ch_repeat].x_range
+				p.y_range = plot_dict[ch_repeat].y_range
 
 	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
 	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
@@ -542,6 +528,27 @@ def plot_case(case, show_size_standard=False, w=1000, h=300):
 	grid = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
 	show(grid)
 	save(grid)
+
+# def reindex_case(case):
+# 	for ch in case.df.columns:
+# 		if ch in channels_of_interest.keys():
+# 			i_dict = {}
+# 			if 'channel' in ch and not ch.startswith('x_fitted'):
+# 				x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+# 				X = np.around(10 * case.df[x_col_name])
+# 				# print('X = {}'.format(X))
+# 				i_dict = {int(x): set() for x in X}
+# 				for i, x in X.items():
+# 					x = int(x)
+# 					i_dict[x].add(case.df[ch][i])
+# 				i_dict = {x:max(v) for x,v in i_dict.items() if x >= 0}
+# 				case.re_df[ch] = pd.Series(i_dict)
+# 				# case.re_df[ch] = pd.Series(index=X, data=case.df[ch])
+# 				# print(case.re_df[ch])
+# 	return case
+
+debug = False
+use_timestamp = True
 
 def main():
 	owd = os.getcwd()	# original working directory
@@ -559,8 +566,8 @@ def main():
 		case = pick_peak_one(case)
 		case = make_decay_curve(case)
 		case = local_southern(case)
-		case = reindex_case(case)
-		case = peaks_to_annotate(case)
+		# case = reindex_case(case)
+		case = index_of_peaks_to_annotate(case)
 		# plot_case_pdf(case)
 		plot_case(case, show_size_standard=True, w=1100, h=350)
 
