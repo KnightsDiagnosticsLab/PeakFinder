@@ -21,7 +21,7 @@ from outliers import smirnov_grubbs as grubbs
 from bokeh.io import output_file, show, save
 from bokeh.layouts import gridplot, column
 from bokeh.plotting import figure
-from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, WheelPanTool
+from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, WheelPanTool, LegendItem, Legend
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 
@@ -412,34 +412,34 @@ channels_of_interest = {
 			'SCL_channel_1_repeat':'black'
 	}
 regions_of_interest = {
-			'IGH-A_channel_1':[(310,360)],
-			'IGH-B_channel_1':[(250,295)],
-			'IGH-C_channel_2':[(100,170)],
-			'IGK-A_channel_1':[(120,160),(190,210),(260,300)],
-			'IGK-B_channel_1':[(210,250),(270,300),(350,390)],
-			'TCRB-A_channel_1':[(240,285)],
-			'TCRB-A_channel_2':[(240,285)],
-			'TCRB-B_channel_1':[(240,285)],
-			'TCRB-C_channel_1':[(170,210),(285,325)],
-			'TCRB-C_channel_2':[(170,210),(285,325)],
-			'TCRG-A_channel_1':[(175,195),(230,255)],
-			'TCRG-A_channel_2':[(145,175),(195,230)],
-			'TCRG-B_channel_1':[(110,140),(195,220)],
-			'TCRG-B_channel_2':[(80,110),(160,195)],
-			'IGH-A_channel_1_repeat':[(310,360)],
-			'IGH-B_channel_1_repeat':[(250,295)],
-			'IGH-C_channel_2_repeat':[(100,170)],
-			'IGK-A_channel_1_repeat':[(120,160),(190,210),(260,300)],
-			'IGK-B_channel_1_repeat':[(210,250),(270,300),(350,390)],
-			'TCRB-A_channel_1_repeat':[(240,285)],
-			'TCRB-A_channel_2_repeat':[(240,285)],
-			'TCRB-B_channel_1_repeat':[(240,285)],
-			'TCRB-C_channel_1_repeat':[(170,210),(285,325)],
-			'TCRB-C_channel_2_repeat':[(170,210),(285,325)],
-			'TCRG-A_channel_1_repeat':[(175,195),(230,255)],
-			'TCRG-A_channel_2_repeat':[(145,175),(195,230)],
-			'TCRG-B_channel_1_repeat':[(110,140),(195,220)],
-			'TCRG-B_channel_2_repeat':[(80,110),(160,195)]
+			'IGH-A_channel_1':[(310,360,'meow','black')],
+			'IGH-B_channel_1':[(250,295,'meow','black')],
+			'IGH-C_channel_2':[(100,170,'meow','black')],
+			'IGK-A_channel_1':[(120,160,'meow','black'),(190,210,'meow','black'),(260,300,'meow','black')],
+			'IGK-B_channel_1':[(210,250,'meow','black'),(270,300,'meow','black'),(350,390,'meow','black')],
+			'TCRB-A_channel_1':[(240,285,'meow','black')],
+			'TCRB-A_channel_2':[(240,285,'meow','black')],
+			'TCRB-B_channel_1':[(240,285,'meow','black')],
+			'TCRB-C_channel_1':[(170,210,'meow','red'),(285,325,'VDJ','blue')],
+			'TCRB-C_channel_2':[(170,210,'meow','black'),(285,325,'meow','black')],
+			'TCRG-A_channel_1':[(175,195,'meow','black'),(230,255,'meow','black')],
+			'TCRG-A_channel_2':[(145,175,'meow','black'),(195,230,'meow','black')],
+			'TCRG-B_channel_1':[(110,140,'meow','black'),(195,220,'meow','black')],
+			'TCRG-B_channel_2':[(80,110,'meow','black'),(160,195,'meow','black')],
+			'IGH-A_channel_1_repeat':[(310,360,'meow','black')],
+			'IGH-B_channel_1_repeat':[(250,295,'meow','black')],
+			'IGH-C_channel_2_repeat':[(100,170,'meow','black')],
+			'IGK-A_channel_1_repeat':[(120,160,'meow','blue'),(190,210,'meow','red'),(260,300,'meow','green')],
+			'IGK-B_channel_1_repeat':[(210,250,'meow','black'),(270,300,'meow','black'),(350,390,'meow','black')],
+			'TCRB-A_channel_1_repeat':[(240,285,'meow','black')],
+			'TCRB-A_channel_2_repeat':[(240,285,'meow','black')],
+			'TCRB-B_channel_1_repeat':[(240,285,'meow','black')],
+			'TCRB-C_channel_1_repeat':[(170,210,'meow','black'),(285,325,'meow','black')],
+			'TCRB-C_channel_2_repeat':[(170,210,'meow','black'),(285,325,'meow','black')],
+			'TCRG-A_channel_1_repeat':[(175,195,'meow','black'),(230,255,'meow','black')],
+			'TCRG-A_channel_2_repeat':[(145,175,'meow','black'),(195,230,'meow','black')],
+			'TCRG-B_channel_1_repeat':[(110,140,'meow','black'),(195,220,'meow','black')],
+			'TCRG-B_channel_2_repeat':[(80,110,'meow','black'),(160,195,'meow','black')]
 	}
 
 def index_of_peaks_to_annotate(case):
@@ -448,7 +448,7 @@ def index_of_peaks_to_annotate(case):
 		if ch in regions_of_interest.keys():
 			peaks_x, _ = find_peaks(case.df[ch], height=600, prominence=100)
 			peaks_in_roi = []
-			for x_start, x_end in regions_of_interest[ch]:
+			for x_start, x_end, _, _ in regions_of_interest[ch]:
 				peaks_in_roi.extend([x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end])
 			peaks_y = case.df[ch][peaks_in_roi].to_list()
 			peaks_in_roi = [x for y,x in sorted(zip(peaks_y, peaks_in_roi), reverse=True)]
@@ -478,11 +478,20 @@ def plot_channels_of_interest(case, ch, plot_dict, w, h):
 		x = case.df[x_col_name].to_list()
 		y = case.df[ch].to_list()
 		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
-		if ch in regions_of_interest.keys():
-			# mark regions in gray
-			for x_left, x_right in regions_of_interest[ch]:
-				roi = BoxAnnotation(left=x_left, right=x_right, fill_color='black', fill_alpha=0.05)
-				p.add_layout(roi)
+		plot_dict[ch] = p
+	return plot_dict
+
+def highlight_regions_of_interest(case, ch, plot_dict, w, h):
+	if ch in regions_of_interest.keys():
+		p = plot_dict[ch]
+		legends = []
+		for x_left, x_right, roi_name, roi_color in regions_of_interest[ch]:
+			dummy_dot = p.line([0,0],[1,1], line_width=20, color=roi_color, alpha=0.05)
+			roi = BoxAnnotation(left=x_left, right=x_right, fill_color=roi_color, fill_alpha=0.05)
+			p.add_layout(roi)
+			legends.append(LegendItem(label=roi_name, renderers=[dummy_dot]))
+		p.add_layout(Legend(items=legends, location='top_right'))
+		# print(p.legend.items)
 		plot_dict[ch] = p
 	return plot_dict
 
@@ -543,6 +552,7 @@ def plot_case(case, w=1000, h=300):
 	for ch in sorted(case.df.columns):
 		plot_dict = plot_scl(case, ch, plot_dict, w, h)
 		plot_dict = plot_channels_of_interest(case, ch, plot_dict, w, h)
+		plot_dict = highlight_regions_of_interest(case, ch, plot_dict, w, h)
 		plot_dict = plot_size_standard(case, ch, plot_dict, w, h)
 		plot_peaks_of_interest(case, ch, plot_dict, w, h)
 
