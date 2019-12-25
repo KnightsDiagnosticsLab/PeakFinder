@@ -347,6 +347,7 @@ def plot_peaks_of_interest(case, ch, plot_dict, w, h):
 		peaks_index = case.index_of_peaks_to_annotate[ch]
 		x_peaks = case.df[x_col_name][peaks_index].to_list()
 		y_peaks = case.df[ch][peaks_index].to_list()
+		p.y_range.start = -100
 		if len(y_peaks) > 0:
 			p.y_range.end = 1.3*max(y_peaks)
 		else:
