@@ -6,16 +6,9 @@ import sys
 import re
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from time import strftime
 from scipy.signal import find_peaks, peak_prominences, peak_widths
 from scipy.interpolate import InterpolatedUnivariateSpline
-from types import SimpleNamespace
-from pprint import pprint
 from itertools import combinations
-import mpl_toolkits.mplot3d as m3d
-import re
 from outliers import smirnov_grubbs as grubbs
 
 from bokeh.io import output_file, show, save
@@ -24,51 +17,6 @@ from bokeh.plotting import figure
 from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, WheelPanTool, LegendItem, Legend
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
-
-timestr = strftime("%Y%m%d-%H%M%S")
-
-fig_size = plt.rcParams["figure.figsize"]
-fig_size[0] = 8
-fig_size[1] = 6
-plt.rcParams["figure.figsize"] = fig_size
-
-def autoscale_y(ax,margin=0.1):
-	"""Courtesy of Stack Overflow: https://stackoverflow.com/questions/29461608/matplotlib-fixing-x-axis-scale-and-autoscale-y-axis
-
-	This function rescales the y-axis based on the data that is visible given the current xlim of the axis.
-	ax -- a matplotlib axes object
-	margin -- the fraction of the total height of the y-data to pad the upper and lower ylims"""
-
-	def get_bottom_top(line):
-		xd = line.get_xdata()
-		yd = line.get_ydata()
-		lo,hi = ax.get_xlim()
-		y_displayed = yd[((xd>lo) & (xd<hi))]
-		print('y_displayed = {}'.format(y_displayed))
-		h = np.max(y_displayed) - np.min(y_displayed)
-		bot = np.min(y_displayed)-margin*h
-		top = np.max(y_displayed)+margin*h
-		return bot,top
-
-	lines = ax.get_lines()
-	bot,top = np.inf, -np.inf
-
-	for line in lines:
-		new_bot, new_top = get_bottom_top(line)
-		if new_bot < bot: bot = new_bot
-		if new_top > top: top = new_top
-
-	ax.set_ylim(bot,top)
-
-def autoscale_y_2(x_window_start, x_window_end, x_series, y_series):
-	window_indices = [i for i, v in x_series.items() if v > x_window_start and v < x_window_end]
-	y_max = y_series[window_indices].max()
-	y_top = y_max + 0.1 * abs(y_max)
-	if y_top < 200:
-		y_top = 200
-	y_min = y_series[window_indices].min()
-	y_bot = y_min - 0.1 * abs(y_min)
-	return y_bot, y_top
 
 def pretty_name(c,t):
 	if 'channel' in c:
@@ -96,19 +44,19 @@ def organize_files(path):
 	case_names = {''.join(x) for x in case_names_as_ll}	# finally we have a set of unique strings
 
 	# make a dictionary of case names to case files
-	cd = {cn : { t : [f for f in csv_list if cn in f and t in f] for t in tests } for cn in case_names}
-	cases = {cn: Case() for cn in case_names}
-	for cn,c in cases.items():
-		c.name = cn
-		c.files = cd[cn]
+	cd = {case_name : { t : [f for f in csv_list if case_name in f and t in f] for t in tests } for case_name in case_names}
+	cases = {case_name: Case() for case_name in case_names}
+	for case_name,c in cases.items():
+		c.name = case_name
+		c.files = cd[case_name]
 		c.ladder = {}
 		c.rox500 = []
 		c.index_of_peaks_to_annotate = {}
-		c.index_of_peaks_to_annotate = {}
-		c.re_df = {}
 	return cases
 
 class Case(object):
+	"""	I'm sure there's a better way than making a dummy class like this.
+	"""
 	pass
 
 def gather_case_data(case, case_name, path):
@@ -149,95 +97,6 @@ def local_southern(case, order=2):
 		x_df.columns = [col_name]
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return case
-
-# def plot_case_pdf(case):
-# 	x_window_start = 75*10
-# 	x_window_end = 400*10
-
-# 	if use_timestamp:
-# 		multipage = case.name + '_' + timestr + '.pdf'
-# 	else:
-# 		multipage = case.name + '.pdf'
-
-# 	with PdfPages(multipage) as pdf:
-# 		has_repeat = [ch for ch in case.re_df.keys() if '_'.join([ch, 'repeat']) in case.re_df.keys() and ch in channels_of_interest.keys()]
-# 		# no_repeat = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and ch not in has_repeat]
-# 		scl = [ch for ch in case.re_df.keys() if ch in channels_of_interest.keys() and 'SCL' in ch]
-
-# 		for channel in has_repeat:
-# 			channel_repeat = '_'.join([channel, 'repeat'])
-
-# 			p, axs = plt.subplots(nrows=2, ncols=1)
-# 			p.subplots_adjust(hspace=0.5)
-# 			p.suptitle(case.name)
-
-# 			for i, ch in enumerate([channel, channel_repeat]):
-# 				for x_start,x_end in regions_of_interest[ch]:
-# 					axs[i].axvspan(x_start*10, x_end*10, facecolor='black', alpha=0.05)
-# 				df = case.re_df[ch]
-# 				peaks_x = case.index_of_peaks_to_annotate[ch]
-# 				axs[i].plot(df.iloc[peaks_x], 'o', color='black', fillstyle='none')
-# 				# texts = [axs[i].text(x, 1.05 * df.iloc[x], str(x)) for x in peaks_x]
-# 				for x in peaks_x:
-# 					axs[i].annotate(str(x), xy=(x, 1.05 * df.iloc[x]))
-# 				axs[i].plot(df, linewidth=0.25, color=channels_of_interest[ch])
-# 				axs[i].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-# 				axs[i].set_xlim([x_window_start, x_window_end])
-# 				axs[i].set_ylabel('RFU', fontsize=6)
-# 				axs[i].set_xlabel('Fragment Size', fontsize=6)
-# 				axs[i].yaxis.set_tick_params(labelsize=6)
-# 				y_max = df[x_window_start:x_window_end].max()
-# 				y_top = y_max + 0.1 * abs(y_max)
-# 				if y_top < 200:
-# 					y_top = 200
-# 				y_min = df[x_window_start:x_window_end].min()
-# 				y_bot = y_min - 0.1 * abs(y_min)
-# 				axs[i].set_ylim(top=y_top, bottom=y_bot)
-
-# 			pdf.savefig()
-# 			plt.close(p)
-
-# 			ch_4 = re.sub(r'channel_\d', 'channel_4', channel)
-# 			ch_repeat_4 = re.sub(r'channel_\d', 'channel_4', channel_repeat)
-
-# 			p, axs = plt.subplots(nrows=2, ncols=1)
-# 			p.subplots_adjust(hspace=0.5)
-# 			p.suptitle(case.name)
-
-# 			for i, ch in enumerate([ch_4, ch_repeat_4]):
-# 				df = case.df[ch]
-# 				axs[i].plot(df, linewidth=0.25)
-# 				axs[i].plot(df[case.ladder[ch]], 'x', color='red')
-# 				axs[i].set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-# 				axs[i].set_ylabel('RFU', fontsize=6)
-# 				axs[i].set_xlabel('Fragment Size', fontsize=6)
-# 				axs[i].yaxis.set_tick_params(labelsize=6)
-# 				axs[i].set_ylim(top=2000)
-# 				axs[i].set_xlim(left=1000)
-
-# 			pdf.savefig()
-# 			plt.close(p)
-
-# 		for ch in scl:
-
-# 			p, axs = plt.subplots(nrows=1, ncols=1)
-# 			p.subplots_adjust(hspace=0.5)
-# 			p.suptitle(case.name)
-
-# 			axs.set_title(ch, fontdict={'fontsize': 8, 'fontweight': 'medium'})
-# 			axs.set_ylabel('RFU', fontsize=6)
-# 			axs.set_xlabel('Fragment Size', fontsize=6)
-# 			axs.yaxis.set_tick_params(labelsize=6)
-
-# 			if case.ladder_success: clr = 'green'
-# 			else: clr = 'red'
-# 			axs.plot(case.ladder_SCL, case.df[ch][case.ladder_SCL], 'o', fillstyle='none', color=clr)
-# 			axs.plot(case.df[ch], linewidth=0.25, color=channels_of_interest[ch])
-# 			axs.plot(case.df['decay'], linewidth=0.25, color=clr)
-
-# 			pdf.savefig()
-# 			plt.close(p)
-# 		print('Done making {}'.format(multipage))
 
 def pick_peak_one(case):
 	case.ladder_success = False
@@ -317,8 +176,6 @@ def build_ladder(df, size_standard, label_name):
 			break
 	return ladder
 
-problem_cases = ['19KD-348M0008_TCRB-B_channel_4_repeat']
-
 def reduce_choices(df, label_name):
 	t = 2.0
 	peaks_x_restricted, _ = find_peaks(df, height=[20,1000], distance=30, width=2)
@@ -337,19 +194,6 @@ def reduce_choices(df, label_name):
 	std2 = [(x1,x2) for x1, x2 in zip(std2_below, std2_above)]
 	peaks_x, _ = find_peaks(df, height=[std2_below, std2_above], prominence=20, width=2)
 	choices_x = [x for x in peaks_x if x > tallest[0]]
-
-	if len(choices_x) > 20:
-		p, axs = plt.subplots(nrows=1, ncols=1)
-		axs.plot(df[choices_x], 'o', fillstyle='none')
-		# axs[0].plot(df[best_ladder_i], 'x', fillstyle='none')
-		axs.plot(df.index.tolist(), df, linewidth=0.25)
-		# axs[0].plot(polyzx(ss),np.zeros(len(ss)), '|', color='red')
-		# axs[0].plot(best_ladder_i, polyxy(best_ladder_i), linewidth=0.25)
-		axs.plot(df.index.tolist(), polyxy(df.index.tolist()) + t*std, linewidth=0.25)
-		axs.plot(df.index.tolist(), polyxy(df.index.tolist()) - t*std, linewidth=0.25)
-		plt.ylim((-500,1000))
-		# plt.show()
-		plt.close(p)
 	return choices_x, std
 
 def size_standard(case, channel='channel_4'):
@@ -418,11 +262,11 @@ regions_of_interest = {
 			'IGH-C_channel_2':[(100,170,'FR3-JH','blue')],
 			'IGK-A_channel_1':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
 			'IGK-B_channel_1':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
-			'TCRB-A_channel_1':[(240,285,'Vβ_Jβ_Jb2.X','blue')],
-			'TCRB-A_channel_2':[(240,285,'Vβ_Jβ_Jb1.X','blue')],
+			'TCRB-A_channel_1':[(240,285,'Vβ_Jβ_Jβ2.X','blue')],
+			'TCRB-A_channel_2':[(240,285,'Vβ_Jβ_Jβ1.X','blue')],
 			'TCRB-B_channel_1':[(240,285,'Vβ_Jβ2','blue')],
-			'TCRB-C_channel_1':[(170,210,'Dβ_Jβ_Db2','blue'),(285,325,'???','green')],
-			'TCRB-C_channel_2':[(170,210,'Dβ_Jβ_Db1','blue'),(285,325,'???','green')],
+			'TCRB-C_channel_1':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
+			'TCRB-C_channel_2':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
 			'TCRG-A_channel_1':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
 			'TCRG-A_channel_2':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
 			'TCRG-B_channel_1':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
@@ -432,11 +276,11 @@ regions_of_interest = {
 			'IGH-C_channel_2_repeat':[(100,170,'FR3-JH','blue')],
 			'IGK-A_channel_1_repeat':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
 			'IGK-B_channel_1_repeat':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
-			'TCRB-A_channel_1_repeat':[(240,285,'Vβ_Jβ_Jb2.X','blue')],
-			'TCRB-A_channel_2_repeat':[(240,285,'Vβ_Jβ_Jb1.X','blue')],
+			'TCRB-A_channel_1_repeat':[(240,285,'Vβ_Jβ_Jβ2.X','blue')],
+			'TCRB-A_channel_2_repeat':[(240,285,'Vβ_Jβ_Jβ1.X','blue')],
 			'TCRB-B_channel_1_repeat':[(240,285,'Vβ_Jβ2','blue')],
-			'TCRB-C_channel_1_repeat':[(170,210,'Dβ_Jβ_Db2','blue'),(285,325,'???','green')],
-			'TCRB-C_channel_2_repeat':[(170,210,'Dβ_Jβ_Db1','blue'),(285,325,'???','green')],
+			'TCRB-C_channel_1_repeat':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
+			'TCRB-C_channel_2_repeat':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
 			'TCRG-A_channel_1_repeat':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
 			'TCRG-A_channel_2_repeat':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
 			'TCRG-B_channel_1_repeat':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
@@ -447,17 +291,17 @@ def index_of_peaks_to_annotate(case):
 	for ch in case.df.columns:
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		if ch in regions_of_interest.keys():
-			peaks_x, _ = find_peaks(case.df[ch], height=600, prominence=100)
-			peaks_in_roi = []
+			peaks_x, _ = find_peaks(case.df[ch], prominence=100)
+			peaks_in_all_roi = []
 			for x_start, x_end, _, _ in regions_of_interest[ch]:
-				peaks_in_roi.extend([x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end])
-			peaks_y = case.df[ch][peaks_in_roi].to_list()
-			peaks_in_roi = [x for y,x in sorted(zip(peaks_y, peaks_in_roi), reverse=True)]
-			if len(peaks_in_roi) > 5:
-				peaks_in_roi = peaks_in_roi[0:5]
-
-
-			case.index_of_peaks_to_annotate[ch] = peaks_in_roi[:]
+				peaks_in_current_roi = [x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end]
+				peaks_y = case.df[ch][peaks_in_current_roi].to_list()
+				peaks_in_current_roi = [x for y,x in sorted(zip(peaks_y, peaks_in_current_roi), reverse=True)]
+				if len(peaks_in_current_roi) > 5:
+					peaks_in_all_roi.extend(peaks_in_current_roi[0:5])
+				else:
+					peaks_in_all_roi.extend(peaks_in_current_roi)
+			case.index_of_peaks_to_annotate[ch] = peaks_in_all_roi[:]
 	return case
 
 def plot_scl(case, ch, plot_dict, w, h):
@@ -545,48 +389,30 @@ def sync_axes(plot_dict):
 	return plot_dict
 
 def plot_case(case, w=1000, h=300):
-	# Need to break this in to sub functions. It's hard to follow like this.
 	silence(FIXED_SIZING_MODE, True)
-	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-	output_file(case.name + '.html')
 	plot_dict = {}
 	for ch in sorted(case.df.columns):
 		plot_dict = plot_scl(case, ch, plot_dict, w, h)
 		plot_dict = plot_channels_of_interest(case, ch, plot_dict, w, h)
 		plot_dict = highlight_regions_of_interest(case, ch, plot_dict, w, h)
 		plot_dict = plot_size_standard(case, ch, plot_dict, w, h)
-		plot_peaks_of_interest(case, ch, plot_dict, w, h)
+		plot_dict = plot_peaks_of_interest(case, ch, plot_dict, w, h)
 
 	plot_dict = sync_axes(plot_dict)
 
+	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
 	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
 	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
 	plot_keys = [*scl_keys, *plot_keys]
 	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
 
+	case_html = case.name + '.html'
+	output_file(case_html)
 	show(plots)
 	save(plots)
-
-# def reindex_case(case):
-# 	for ch in case.df.columns:
-# 		if ch in channels_of_interest.keys():
-# 			i_dict = {}
-# 			if 'channel' in ch and not ch.startswith('x_fitted'):
-# 				x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
-# 				X = np.around(10 * case.df[x_col_name])
-# 				# print('X = {}'.format(X))
-# 				i_dict = {int(x): set() for x in X}
-# 				for i, x in X.items():
-# 					x = int(x)
-# 					i_dict[x].add(case.df[ch][i])
-# 				i_dict = {x:max(v) for x,v in i_dict.items() if x >= 0}
-# 				case.re_df[ch] = pd.Series(i_dict)
-# 				# case.re_df[ch] = pd.Series(index=X, data=case.df[ch])
-# 				# print(case.re_df[ch])
-# 	return case
+	print('Saved {}'.format(case_html))
 
 debug = False
-use_timestamp = True
 
 def main():
 	owd = os.getcwd()	# original working directory
@@ -597,7 +423,7 @@ def main():
 	# if not os.path.exists(output_path): os.mkdir(output_path)
 	for case_name in sorted(cases.keys()):
 		case = cases[case_name]
-		print('Processing raw data for {}'.format(case_name))
+		print('Processing {}'.format(case_name))
 		case = gather_case_data(case, case_name, path)
 		case = size_standard(case)
 		case = baseline_correction(case)
