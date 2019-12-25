@@ -415,6 +415,9 @@ def plot_case(case, w=1000, h=300):
 
 debug = False
 
+def replicate_peaks(cases, ch_list):
+	return case
+
 def main():
 	owd = os.getcwd()	# original working directory
 	path = os.path.abspath(sys.argv[1])
