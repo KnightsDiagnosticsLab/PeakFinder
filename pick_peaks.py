@@ -52,6 +52,7 @@ def organize_files(path):
 		c.ladder = {}
 		c.rox500 = []
 		c.index_of_peaks_to_annotate = {}
+		c.index_of_replicate_peaks = {}
 	return cases
 
 class Case(object):
@@ -340,11 +341,14 @@ def highlight_regions_of_interest(case, ch, plot_dict, w, h):
 		plot_dict[ch] = p
 	return plot_dict
 
-def plot_peaks_of_interest(case, ch, plot_dict, w, h):
+def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only):
 	if ch in regions_of_interest.keys():
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		p = plot_dict[ch]
-		peaks_index = case.index_of_peaks_to_annotate[ch]
+		if replicate_only:
+			peaks_index = case.index_of_replicate_peaks[ch]
+		else:
+			peaks_index = case.index_of_peaks_to_annotate[ch]
 		x_peaks = case.df[x_col_name][peaks_index].to_list()
 		y_peaks = case.df[ch][peaks_index].to_list()
 		p.y_range.start = -100
@@ -389,7 +393,7 @@ def sync_axes(plot_dict):
 				p.y_range = plot_dict[ch_repeat].y_range
 	return plot_dict
 
-def plot_case(case, w=1000, h=300):
+def plot_case(case, replicate_only, w=1000, h=300):
 	silence(FIXED_SIZING_MODE, True)
 	plot_dict = {}
 	for ch in sorted(case.df.columns):
@@ -397,7 +401,7 @@ def plot_case(case, w=1000, h=300):
 		plot_dict = plot_channels_of_interest(case, ch, plot_dict, w, h)
 		plot_dict = highlight_regions_of_interest(case, ch, plot_dict, w, h)
 		plot_dict = plot_size_standard(case, ch, plot_dict, w, h)
-		plot_dict = plot_peaks_of_interest(case, ch, plot_dict, w, h)
+		plot_dict = plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only)
 
 	plot_dict = sync_axes(plot_dict)
 
@@ -415,7 +419,27 @@ def plot_case(case, w=1000, h=300):
 
 debug = False
 
-def replicate_peaks(cases, ch_list):
+def replicate_peaks(case):
+	for ch in case.index_of_peaks_to_annotate.keys():
+		if ch not in case.index_of_replicate_peaks.keys():
+			case.index_of_replicate_peaks[ch] = []
+			if 'repeat' not in ch:
+				x_ch = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+				ch_repeat = ch + '_repeat'
+				x_ch_repeat = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch_repeat)
+				p1 = case.index_of_peaks_to_annotate[ch]
+				p2 = case.index_of_peaks_to_annotate[ch_repeat]
+				peaks1 = set()
+				peaks2 = set()
+				for i in p1:
+					i_re = case.df[x_ch][i]
+					for j in p2:
+						j_re = case.df[x_ch_repeat][j]
+						if abs(i_re-j_re) < 1.0:
+							peaks1.add(i)
+							peaks2.add(j)
+				case.index_of_replicate_peaks[ch] = sorted(list(peaks1))
+				case.index_of_replicate_peaks[ch_repeat] = sorted(list(peaks2))
 	return case
 
 def main():
@@ -435,7 +459,8 @@ def main():
 		case = make_decay_curve(case)
 		case = local_southern(case)
 		case = index_of_peaks_to_annotate(case)
-		plot_case(case, w=1100, h=350)
+		case = replicate_peaks(case)
+		plot_case(case, replicate_only=True, w=1100, h=350)
 
 if __name__ == '__main__':
 	main()
