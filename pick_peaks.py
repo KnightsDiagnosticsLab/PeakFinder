@@ -357,7 +357,8 @@ def size_standard(case, channel='channel_4'):
 	rox500_14 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500_13 = [50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500_75_400 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400]
-	rox500 = rox500_75_400
+	rox500_75_450 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
+	rox500 = rox500_75_450
 	case.rox500 = rox500[:]
 	ladder_channels = [ch for ch in case.df.columns if channel in ch]
 	for ch in ladder_channels:
@@ -412,34 +413,34 @@ channels_of_interest = {
 			'SCL_channel_1_repeat':'black'
 	}
 regions_of_interest = {
-			'IGH-A_channel_1':[(310,360,'meow','black')],
-			'IGH-B_channel_1':[(250,295,'meow','black')],
-			'IGH-C_channel_2':[(100,170,'meow','black')],
-			'IGK-A_channel_1':[(120,160,'meow','black'),(190,210,'meow','black'),(260,300,'meow','black')],
-			'IGK-B_channel_1':[(210,250,'meow','black'),(270,300,'meow','black'),(350,390,'meow','black')],
-			'TCRB-A_channel_1':[(240,285,'meow','black')],
-			'TCRB-A_channel_2':[(240,285,'meow','black')],
-			'TCRB-B_channel_1':[(240,285,'meow','black')],
-			'TCRB-C_channel_1':[(170,210,'meow','red'),(285,325,'VDJ','blue')],
-			'TCRB-C_channel_2':[(170,210,'meow','black'),(285,325,'meow','black')],
-			'TCRG-A_channel_1':[(175,195,'meow','black'),(230,255,'meow','black')],
-			'TCRG-A_channel_2':[(145,175,'meow','black'),(195,230,'meow','black')],
-			'TCRG-B_channel_1':[(110,140,'meow','black'),(195,220,'meow','black')],
-			'TCRG-B_channel_2':[(80,110,'meow','black'),(160,195,'meow','black')],
-			'IGH-A_channel_1_repeat':[(310,360,'meow','black')],
-			'IGH-B_channel_1_repeat':[(250,295,'meow','black')],
-			'IGH-C_channel_2_repeat':[(100,170,'meow','black')],
-			'IGK-A_channel_1_repeat':[(120,160,'meow','blue'),(190,210,'meow','red'),(260,300,'meow','green')],
-			'IGK-B_channel_1_repeat':[(210,250,'meow','black'),(270,300,'meow','black'),(350,390,'meow','black')],
-			'TCRB-A_channel_1_repeat':[(240,285,'meow','black')],
-			'TCRB-A_channel_2_repeat':[(240,285,'meow','black')],
-			'TCRB-B_channel_1_repeat':[(240,285,'meow','black')],
-			'TCRB-C_channel_1_repeat':[(170,210,'meow','black'),(285,325,'meow','black')],
-			'TCRB-C_channel_2_repeat':[(170,210,'meow','black'),(285,325,'meow','black')],
-			'TCRG-A_channel_1_repeat':[(175,195,'meow','black'),(230,255,'meow','black')],
-			'TCRG-A_channel_2_repeat':[(145,175,'meow','black'),(195,230,'meow','black')],
-			'TCRG-B_channel_1_repeat':[(110,140,'meow','black'),(195,220,'meow','black')],
-			'TCRG-B_channel_2_repeat':[(80,110,'meow','black'),(160,195,'meow','black')]
+			'IGH-A_channel_1':[(310,360,'FR1-JH','blue')],
+			'IGH-B_channel_1':[(250,295,'FR2-JH','blue')],
+			'IGH-C_channel_2':[(100,170,'FR3-JH','blue')],
+			'IGK-A_channel_1':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
+			'IGK-B_channel_1':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
+			'TCRB-A_channel_1':[(240,285,'Vβ_Jβ_Jb2.X','blue')],
+			'TCRB-A_channel_2':[(240,285,'Vβ_Jβ_Jb1.X','blue')],
+			'TCRB-B_channel_1':[(240,285,'Vβ_Jβ2','blue')],
+			'TCRB-C_channel_1':[(170,210,'Dβ_Jβ_Db2','blue'),(285,325,'???','green')],
+			'TCRB-C_channel_2':[(170,210,'Dβ_Jβ_Db1','blue'),(285,325,'???','green')],
+			'TCRG-A_channel_1':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
+			'TCRG-A_channel_2':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
+			'TCRG-B_channel_1':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
+			'TCRG-B_channel_2':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
+			'IGH-A_channel_1_repeat':[(310,360,'FR1-JH','blue')],
+			'IGH-B_channel_1_repeat':[(250,295,'FR2-JH','blue')],
+			'IGH-C_channel_2_repeat':[(100,170,'FR3-JH','blue')],
+			'IGK-A_channel_1_repeat':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
+			'IGK-B_channel_1_repeat':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
+			'TCRB-A_channel_1_repeat':[(240,285,'Vβ_Jβ_Jb2.X','blue')],
+			'TCRB-A_channel_2_repeat':[(240,285,'Vβ_Jβ_Jb1.X','blue')],
+			'TCRB-B_channel_1_repeat':[(240,285,'Vβ_Jβ2','blue')],
+			'TCRB-C_channel_1_repeat':[(170,210,'Dβ_Jβ_Db2','blue'),(285,325,'???','green')],
+			'TCRB-C_channel_2_repeat':[(170,210,'Dβ_Jβ_Db1','blue'),(285,325,'???','green')],
+			'TCRG-A_channel_1_repeat':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
+			'TCRG-A_channel_2_repeat':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
+			'TCRG-B_channel_1_repeat':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
+			'TCRG-B_channel_2_repeat':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
 	}
 
 def index_of_peaks_to_annotate(case):
@@ -486,7 +487,7 @@ def highlight_regions_of_interest(case, ch, plot_dict, w, h):
 		p = plot_dict[ch]
 		legends = []
 		for x_left, x_right, roi_name, roi_color in regions_of_interest[ch]:
-			dummy_dot = p.line([0,0],[1,1], line_width=20, color=roi_color, alpha=0.05)
+			dummy_dot = p.line([0,0],[1,1], line_width=20, color=roi_color, alpha=0.10)
 			roi = BoxAnnotation(left=x_left, right=x_right, fill_color=roi_color, fill_alpha=0.05)
 			p.add_layout(roi)
 			legends.append(LegendItem(label=roi_name, renderers=[dummy_dot]))
@@ -520,7 +521,7 @@ def plot_size_standard(case, ch, plot_dict, w, h):
 		y = case.df[ch_4].to_list()
 		x_ladder = case.ladder[ch_4]
 		y_ladder = case.df[ch_4][x_ladder].to_list()
-		p = figure(tools='pan,wheel_zoom,reset',title=ch_4, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
+		p = figure(tools='pan,wheel_zoom,reset',title=ch_4, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
 		p.line(x, y, line_width=0.5, color='red')
 		p.ygrid.visible = False
 		p.x(x_ladder, y_ladder)
@@ -594,8 +595,8 @@ def main():
 	cases = organize_files(path)
 	# output_path = os.path.join(path, '/plots')
 	# if not os.path.exists(output_path): os.mkdir(output_path)
-	for case_name, case in cases.items():
-		# if '0084' in case_name:
+	for case_name in sorted(cases.keys()):
+		case = cases[case_name]
 		print('Processing raw data for {}'.format(case_name))
 		case = gather_case_data(case, case_name, path)
 		case = size_standard(case)
@@ -603,9 +604,7 @@ def main():
 		case = pick_peak_one(case)
 		case = make_decay_curve(case)
 		case = local_southern(case)
-		# case = reindex_case(case)
 		case = index_of_peaks_to_annotate(case)
-		# plot_case_pdf(case)
 		plot_case(case, w=1100, h=350)
 
 if __name__ == '__main__':
