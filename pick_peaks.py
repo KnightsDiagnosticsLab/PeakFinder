@@ -218,7 +218,7 @@ def baseline_correction(case):
 			label_name = '_'.join([case.name, ch])
 			if debug: print(label_name)
 			for i in range(0,3):
-				_, prop = find_peaks(case.df[ch], prominence=1, distance=10)
+				_, prop = find_peaks(case.df[ch], prominence=1, distance=20)
 				bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
 				spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
 				spl_df = pd.Series(spl(case.df.index.tolist()))
@@ -292,7 +292,7 @@ def index_of_peaks_to_annotate(case):
 	for ch in case.df.columns:
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		if ch in regions_of_interest.keys():
-			peaks_x, _ = find_peaks(case.df[ch], prominence=100)
+			peaks_x, _ = find_peaks(case.df[ch], prominence=100, height=300)
 			peaks_in_all_roi = []
 			for x_start, x_end, _, _ in regions_of_interest[ch]:
 				peaks_in_current_roi = [x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end]
@@ -307,20 +307,22 @@ def index_of_peaks_to_annotate(case):
 
 def plot_scl(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' in ch:
+		label_name = case.name + '_' + ch
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		x = case.df[ch].index.to_list()
 		y = case.df[ch].to_list()
-		p = figure(tools='pan,wheel_zoom,reset',title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
+		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
 		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
 		plot_dict[ch] = p
 	return plot_dict
 
 def plot_channels_of_interest(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
+		label_name = case.name + '_' + ch
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
-		p = figure(tools='pan,wheel_zoom,reset',title=ch, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
+		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
 		x = case.df[x_col_name].to_list()
 		y = case.df[ch].to_list()
 		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
@@ -365,12 +367,13 @@ def plot_size_standard(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
+		label_name = case.name + '_' + ch_4
 		case.df[ch_4].index.rename('x')
 		x = case.df[ch_4].index.to_list()
 		y = case.df[ch_4].to_list()
 		x_ladder = case.ladder[ch_4]
 		y_ladder = case.df[ch_4][x_ladder].to_list()
-		p = figure(tools='pan,wheel_zoom,reset',title=ch_4, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
+		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
 		p.line(x, y, line_width=0.5, color='red')
 		p.ygrid.visible = False
 		p.x(x_ladder, y_ladder)
@@ -382,7 +385,13 @@ def plot_size_standard(case, ch, plot_dict, w, h):
 	return plot_dict
 
 def sync_axes(plot_dict):
+	sorted_keys = sorted(plot_dict.keys())
+	p1 = plot_dict[sorted_keys[0]]
+	p1.toolbar.active_scroll = p1.select_one(WheelZoomTool)
+	# p1.tools
 	for ch, p in plot_dict.items():
+		p.tools = p1.tools
+		p.toolbar.logo = None
 		ch_repeat = ch + '_repeat'
 		if ch_repeat in plot_dict.keys():
 			if p.y_range.end >= plot_dict[ch_repeat].y_range.end:
@@ -460,7 +469,7 @@ def main():
 		case = local_southern(case)
 		case = index_of_peaks_to_annotate(case)
 		case = replicate_peaks(case)
-		plot_case(case, replicate_only=True, w=1100, h=350)
+		plot_case(case, replicate_only=False, w=1100, h=350)
 
 if __name__ == '__main__':
 	main()
