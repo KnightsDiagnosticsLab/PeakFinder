@@ -12,11 +12,11 @@ from itertools import combinations
 from outliers import smirnov_grubbs as grubbs
 
 from bokeh.io import output_file, show, save
-from bokeh.layouts import gridplot, column
+from bokeh.layouts import column
 from bokeh.plotting import figure
-from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, WheelPanTool, LegendItem, Legend
-from bokeh.core.validation import silence
+from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, LegendItem, Legend
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
+from bokeh.core.validation import silence
 
 def pretty_name(c,t):
 	if 'channel' in c:
@@ -388,7 +388,6 @@ def sync_axes(plot_dict):
 	sorted_keys = sorted(plot_dict.keys())
 	p1 = plot_dict[sorted_keys[0]]
 	p1.toolbar.active_scroll = p1.select_one(WheelZoomTool)
-	# p1.tools
 	for ch, p in plot_dict.items():
 		p.tools = p1.tools
 		p.toolbar.logo = None
