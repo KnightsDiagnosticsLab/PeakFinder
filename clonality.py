@@ -386,7 +386,12 @@ def plot_size_standard(case, ch, plot_dict, w, h):
 		plot_dict[ch_4] = p
 	return plot_dict
 
-def plot_empty_channel_3(plot_dict):
+def plot_empty_channel_3(case, ch, plot_dict, w, h):
+	if ch in channels_of_interest.keys() and 'SCL' not in ch:
+		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+		ch_3 = re.sub(r'channel_\d', 'channel_3', ch)
+		label_name = case.name + '_' + ch_3
+		print(label_name)
 	return plot_dict
 
 def sync_axes(plot_dict):
@@ -414,6 +419,7 @@ def plot_case(case, replicate_only, w=1000, h=300):
 		plot_dict = plot_scl(case, ch, plot_dict, w, h)
 		plot_dict = plot_channels_of_interest(case, ch, plot_dict, w, h)
 		plot_dict = highlight_regions_of_interest(case, ch, plot_dict, w, h)
+		plot_dict = plot_empty_channel_3(case, ch, plot_dict, w, h)
 		plot_dict = plot_size_standard(case, ch, plot_dict, w, h)
 		plot_dict = plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only)
 
@@ -427,8 +433,8 @@ def plot_case(case, replicate_only, w=1000, h=300):
 
 	case_html = case.name + '.html'
 	output_file(case_html)
-	show(plots)
-	save(plots)
+	# show(plots)
+	# save(plots)
 	print('Saved {}'.format(case_html))
 
 debug = False
