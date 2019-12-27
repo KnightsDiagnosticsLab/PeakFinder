@@ -18,6 +18,71 @@ from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 from bokeh.core.validation import silence
 
+channels_of_interest = {
+			'IGH-A_channel_1':'blue',
+			'IGH-B_channel_1':'blue',
+			'IGH-C_channel_2':'green',
+			'IGK-A_channel_1':'blue',
+			'IGK-B_channel_1':'blue',
+			'TCRB-A_channel_1':'blue',
+			'TCRB-A_channel_2':'green',
+			'TCRB-B_channel_1':'blue',
+			'TCRB-C_channel_1':'blue',
+			'TCRB-C_channel_2':'green',
+			'TCRB-C_channel_3':'orange',
+			'TCRG-A_channel_1':'blue',
+			'TCRG-A_channel_2':'green',
+			'TCRG-B_channel_1':'blue',
+			'TCRG-B_channel_2':'green',
+			'SCL_channel_1':'black',
+			'IGH-A_channel_1_repeat':'blue',
+			'IGH-B_channel_1_repeat':'blue',
+			'IGH-C_channel_2_repeat':'green',
+			'IGK-A_channel_1_repeat':'blue',
+			'IGK-B_channel_1_repeat':'blue',
+			'TCRB-A_channel_1_repeat':'blue',
+			'TCRB-A_channel_2_repeat':'green',
+			'TCRB-B_channel_1_repeat':'blue',
+			'TCRB-C_channel_1_repeat':'blue',
+			'TCRB-C_channel_3_repeat':'orange',
+			'TCRB-C_channel_2_repeat':'green',
+			'TCRG-A_channel_1_repeat':'blue',
+			'TCRG-A_channel_2_repeat':'green',
+			'TCRG-B_channel_1_repeat':'blue',
+			'TCRG-B_channel_2_repeat':'green',
+			'SCL_channel_1_repeat':'black'
+	}
+regions_of_interest = {
+			'IGH-A_channel_1':[(310,360,'FR1-JH','blue')],
+			'IGH-B_channel_1':[(250,295,'FR2-JH','blue')],
+			'IGH-C_channel_2':[(100,170,'FR3-JH','blue')],
+			'IGK-A_channel_1':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
+			'IGK-B_channel_1':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
+			'TCRB-A_channel_1':[(240,285,'Vβ_Jβ_Jβ2.X','blue')],
+			'TCRB-A_channel_2':[(240,285,'Vβ_Jβ_Jβ1.X','blue')],
+			'TCRB-B_channel_1':[(240,285,'Vβ_Jβ2','blue')],
+			'TCRB-C_channel_1':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
+			'TCRB-C_channel_2':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
+			'TCRG-A_channel_1':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
+			'TCRG-A_channel_2':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
+			'TCRG-B_channel_1':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
+			'TCRG-B_channel_2':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
+			'IGH-A_channel_1_repeat':[(310,360,'FR1-JH','blue')],
+			'IGH-B_channel_1_repeat':[(250,295,'FR2-JH','blue')],
+			'IGH-C_channel_2_repeat':[(100,170,'FR3-JH','blue')],
+			'IGK-A_channel_1_repeat':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
+			'IGK-B_channel_1_repeat':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
+			'TCRB-A_channel_1_repeat':[(240,285,'Vβ_Jβ_Jβ2.X','blue')],
+			'TCRB-A_channel_2_repeat':[(240,285,'Vβ_Jβ_Jβ1.X','blue')],
+			'TCRB-B_channel_1_repeat':[(240,285,'Vβ_Jβ2','blue')],
+			'TCRB-C_channel_1_repeat':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
+			'TCRB-C_channel_2_repeat':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
+			'TCRG-A_channel_1_repeat':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
+			'TCRG-A_channel_2_repeat':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
+			'TCRG-B_channel_1_repeat':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
+			'TCRG-B_channel_2_repeat':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
+	}
+
 def pretty_name(c,t):
 	if 'channel' in c:
 		channel = re.findall(r'channel_\d$', c)[0]
@@ -225,69 +290,6 @@ def baseline_correction(case):
 				case.df[ch] = case.df[ch] - spl_df
 	return case
 
-channels_of_interest = {
-			'IGH-A_channel_1':'blue',
-			'IGH-B_channel_1':'blue',
-			'IGH-C_channel_2':'green',
-			'IGK-A_channel_1':'blue',
-			'IGK-B_channel_1':'blue',
-			'TCRB-A_channel_1':'blue',
-			'TCRB-A_channel_2':'green',
-			'TCRB-B_channel_1':'blue',
-			'TCRB-C_channel_1':'blue',
-			'TCRB-C_channel_2':'green',
-			'TCRG-A_channel_1':'blue',
-			'TCRG-A_channel_2':'green',
-			'TCRG-B_channel_1':'blue',
-			'TCRG-B_channel_2':'green',
-			'SCL_channel_1':'black',
-			'IGH-A_channel_1_repeat':'blue',
-			'IGH-B_channel_1_repeat':'blue',
-			'IGH-C_channel_2_repeat':'green',
-			'IGK-A_channel_1_repeat':'blue',
-			'IGK-B_channel_1_repeat':'blue',
-			'TCRB-A_channel_1_repeat':'blue',
-			'TCRB-A_channel_2_repeat':'green',
-			'TCRB-B_channel_1_repeat':'blue',
-			'TCRB-C_channel_1_repeat':'blue',
-			'TCRB-C_channel_2_repeat':'green',
-			'TCRG-A_channel_1_repeat':'blue',
-			'TCRG-A_channel_2_repeat':'green',
-			'TCRG-B_channel_1_repeat':'blue',
-			'TCRG-B_channel_2_repeat':'green',
-			'SCL_channel_1_repeat':'black'
-	}
-regions_of_interest = {
-			'IGH-A_channel_1':[(310,360,'FR1-JH','blue')],
-			'IGH-B_channel_1':[(250,295,'FR2-JH','blue')],
-			'IGH-C_channel_2':[(100,170,'FR3-JH','blue')],
-			'IGK-A_channel_1':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
-			'IGK-B_channel_1':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
-			'TCRB-A_channel_1':[(240,285,'Vβ_Jβ_Jβ2.X','blue')],
-			'TCRB-A_channel_2':[(240,285,'Vβ_Jβ_Jβ1.X','blue')],
-			'TCRB-B_channel_1':[(240,285,'Vβ_Jβ2','blue')],
-			'TCRB-C_channel_1':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
-			'TCRB-C_channel_2':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
-			'TCRG-A_channel_1':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
-			'TCRG-A_channel_2':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
-			'TCRG-B_channel_1':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
-			'TCRG-B_channel_2':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
-			'IGH-A_channel_1_repeat':[(310,360,'FR1-JH','blue')],
-			'IGH-B_channel_1_repeat':[(250,295,'FR2-JH','blue')],
-			'IGH-C_channel_2_repeat':[(100,170,'FR3-JH','blue')],
-			'IGK-A_channel_1_repeat':[(120,160,'Vκ-Jκ-1','blue'),(190,210,'Vκ-Jκ-2','green'),(260,300,'Vκ-Jκ-3','red')],
-			'IGK-B_channel_1_repeat':[(210,250,'Vκ-Kde-1','blue'),(270,300,'Vκ-Kde-2','green'),(350,390,'Vκ-Kde-3','red')],
-			'TCRB-A_channel_1_repeat':[(240,285,'Vβ_Jβ_Jβ2.X','blue')],
-			'TCRB-A_channel_2_repeat':[(240,285,'Vβ_Jβ_Jβ1.X','blue')],
-			'TCRB-B_channel_1_repeat':[(240,285,'Vβ_Jβ2','blue')],
-			'TCRB-C_channel_1_repeat':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
-			'TCRB-C_channel_2_repeat':[(170,210,'Dβ_Jβ_Dβ2','blue'),(285,325,'Dβ_Jβ_Dβ1','green')],
-			'TCRG-A_channel_1_repeat':[(175,195,'Vγ10_Jγ1.1_2.1','blue'),(230,255,'Vγ1-8_Jγ1.1_2.1','green')],
-			'TCRG-A_channel_2_repeat':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
-			'TCRG-B_channel_1_repeat':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
-			'TCRG-B_channel_2_repeat':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
-	}
-
 def index_of_peaks_to_annotate(case):
 	for ch in case.df.columns:
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
@@ -384,6 +386,9 @@ def plot_size_standard(case, ch, plot_dict, w, h):
 		plot_dict[ch_4] = p
 	return plot_dict
 
+def plot_empty_channel_3(plot_dict):
+	return plot_dict
+
 def sync_axes(plot_dict):
 	sorted_keys = sorted(plot_dict.keys())
 	p1 = plot_dict[sorted_keys[0]]
@@ -393,12 +398,13 @@ def sync_axes(plot_dict):
 		p.toolbar.logo = None
 		ch_repeat = ch + '_repeat'
 		if ch_repeat in plot_dict.keys():
-			if p.y_range.end >= plot_dict[ch_repeat].y_range.end:
-				plot_dict[ch_repeat].x_range = p.x_range
-				plot_dict[ch_repeat].y_range = p.y_range
-			else:
-				p.x_range = plot_dict[ch_repeat].x_range
-				p.y_range = plot_dict[ch_repeat].y_range
+			if p.y_range.end is not None and plot_dict[ch_repeat].y_range.end is not None:
+				if p.y_range.end >= plot_dict[ch_repeat].y_range.end:
+					plot_dict[ch_repeat].x_range = p.x_range
+					plot_dict[ch_repeat].y_range = p.y_range
+				else:
+					p.x_range = plot_dict[ch_repeat].x_range
+					p.y_range = plot_dict[ch_repeat].y_range
 	return plot_dict
 
 def plot_case(case, replicate_only, w=1000, h=300):
