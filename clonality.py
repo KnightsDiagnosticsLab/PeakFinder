@@ -253,11 +253,11 @@ def reduce_choices(df, label_name):
 	# choices_y_grubbs = grubbs.test(choices_y, alpha=0.05)
 	# choices_x_reduced = [x for x in choices_x if df[x] in choices_y_grubbs]
 	polyxy = np.poly1d(np.polyfit(choices_x, choices_y, deg=1))
-	polybaseline = np.poly1d(np.polyfit(df.index.tolist()[choices_x[0]:], df[choices_x[0]:],deg=1))
+	# polybaseline = np.poly1d(np.polyfit(df.index.tolist()[choices_x[0]:], df[choices_x[0]:],deg=1))
 	std = np.std(choices_y)
 	std2_below = polyxy(df.index.to_list()) - t*std
 	std2_above = polyxy(df.index.to_list()) + t*std
-	std2 = [(x1,x2) for x1, x2 in zip(std2_below, std2_above)]
+	# std2 = [(x1,x2) for x1, x2 in zip(std2_below, std2_above)]
 	peaks_x, _ = find_peaks(df, height=[std2_below, std2_above], prominence=20, width=2)
 	choices_x = [x for x in peaks_x if x > tallest[0]]
 	return choices_x, std
