@@ -44,7 +44,6 @@ channels_of_interest = {
 			'TCRB-A_channel_2_repeat':'green',
 			'TCRB-B_channel_1_repeat':'blue',
 			'TCRB-C_channel_1_repeat':'blue',
-			'TCRB-C_channel_3_repeat':'orange',
 			'TCRB-C_channel_2_repeat':'green',
 			'TCRG-A_channel_1_repeat':'blue',
 			'TCRG-A_channel_2_repeat':'green',
@@ -392,6 +391,12 @@ def plot_empty_channel_3(case, ch, plot_dict, w, h):
 		ch_3 = re.sub(r'channel_\d', 'channel_3', ch)
 		label_name = case.name + '_' + ch_3
 		print(label_name)
+		x = case.df[ch_3].index.to_list()
+		y = case.df[ch_3].to_list()
+		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), tooltips=TOOLTIPS)
+		p.line(x, y, line_width=0.5, color='orange')
+		p.ygrid.visible = False
+		plot_dict[ch_3] = p
 	return plot_dict
 
 def sync_axes(plot_dict):
@@ -433,8 +438,8 @@ def plot_case(case, replicate_only, w=1000, h=300):
 
 	case_html = case.name + '.html'
 	output_file(case_html)
-	# show(plots)
-	# save(plots)
+	show(plots)
+	save(plots)
 	print('Saved {}'.format(case_html))
 
 debug = False
