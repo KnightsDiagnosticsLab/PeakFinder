@@ -403,7 +403,6 @@ def plot_empty_channel_3(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		ch_3 = re.sub(r'channel_\d', 'channel_3', ch)
-		ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
 		label_name = case.name + '_' + ch_3
 		x = case.df[ch_3].index.to_list()
 		y = case.df[ch_3].to_list()
