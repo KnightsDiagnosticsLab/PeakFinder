@@ -50,7 +50,8 @@ channels_of_interest = {
 			'TCRG-B_channel_1_repeat':'blue',
 			'TCRG-B_channel_2_repeat':'green',
 			'SCL_channel_1_repeat':'black'
-	}
+}
+
 regions_of_interest = {
 			'IGH-A_channel_1':[(310,360,'FR1-JH','blue')],
 			'IGH-B_channel_1':[(250,295,'FR2-JH','blue')],
@@ -80,7 +81,15 @@ regions_of_interest = {
 			'TCRG-A_channel_2_repeat':[(145,175,'Vγ10_Jγ1.3_2.3','blue'),(195,230,'Vγ1-8_Jγ1.3_2.3','green')],
 			'TCRG-B_channel_1_repeat':[(110,140,'Vγ11_Jγ1.1_2.1','blue'),(195,220,'Vγ9_Jγ1.1_2.1','green')],
 			'TCRG-B_channel_2_repeat':[(80,110,'Vγ11_Jγ2.1_2.3','blue'),(160,195,'Vγ9_Jγ1.3_2.3','green')],
-	}
+}
+
+channel_colors = {
+	'channel_1':'blue',
+	'channel_2':'green',
+	'channel_3':'orange',
+	'channel_4':'red',
+	'SCL':'black'
+}
 
 def pretty_name(c,t):
 	if 'channel' in c:
@@ -93,7 +102,7 @@ def pretty_name(c,t):
 		pc = c
 	return pc
 
-def organize_files(path):
+def organize_clonality_files(path):
 	tests = [
 				'IGH-A', 'IGH-B', 'IGH-C', 'IGK-A', 'IGK-B',
 				'TCRB-A', 'TCRB-B', 'TCRB-C', 'TCRG-A', 'TCRG-B',
@@ -276,19 +285,25 @@ def size_standard(case, channel='channel_4'):
 		case.ladder[ch] = build_ladder(case.df[ch], rox500, label_name)
 	return case
 
-def baseline_correction(case):
-	for ch in case.df.columns:
-		# ch_repeat = '_'.join([ch, 'repeat'])
-		if ch in channels_of_interest.keys() and 'SCL' not in ch:
-			label_name = '_'.join([case.name, ch])
-			if debug: print(label_name)
-			for i in range(0,3):
-				_, prop = find_peaks(case.df[ch], prominence=1, distance=20)
-				bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
-				spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
-				spl_df = pd.Series(spl(case.df.index.tolist()))
-				case.df[ch] = case.df[ch] - spl_df
+def baseline_correction(case, ch_list=None, iterations=3, prominence=1, distance=20):
+	if ch_list is None:
+		ch_list = case.df.columns
+	else:
+		ch_list = list(set(case.df.columns) & set(ch_list))
+	for ch in ch_list:
+		for i in range(0,iterations):
+			_, prop = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+			bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
+			spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
+			spl_df = pd.Series(spl(case.df.index.tolist()))
+			case.df[ch] = case.df[ch] - spl_df
 	return case
+
+# def baseline_correction_clonality(case):
+# 	for ch in case.df.columns:
+# 		if ch in channels_of_interest.keys() and 'SCL' not in ch:
+# 			case = baseline_correction(case, ch)
+# 	return case
 
 def index_of_peaks_to_annotate(case):
 	for ch in case.df.columns:
@@ -441,7 +456,7 @@ def sync_axes(plot_dict):
 					p.y_range = plot_dict[ch_repeat].y_range
 	return plot_dict
 
-def plot_case(case, replicate_only, w=1000, h=300):
+def plot_clonality_case(case, replicate_only, w=1100, h=350):
 	silence(FIXED_SIZING_MODE, True)
 	plot_dict = {}
 	for ch in sorted(case.df.columns):
@@ -495,7 +510,7 @@ def main():
 	owd = os.getcwd()	# original working directory
 	path = os.path.abspath(sys.argv[1])
 	os.chdir(path)
-	cases = organize_files(path)
+	cases = organize_clonality_files(path)
 	# output_path = os.path.join(path, '/plots')
 	# if not os.path.exists(output_path): os.mkdir(output_path)
 	for case_name in sorted(cases.keys()):
@@ -504,13 +519,13 @@ def main():
 		case = gather_case_data(case, case_name, path)
 		case = size_standard(case)
 		case = find_artifactual_peaks(case)
-		case = baseline_correction(case)
+		case = baseline_correction(case, channels_of_interest.keys(), distance=10)
 		case = pick_peak_one(case)
 		case = make_decay_curve(case)
 		case = local_southern(case)
 		case = index_of_peaks_to_annotate(case)
 		case = replicate_peaks(case)
-		plot_case(case, replicate_only=False, w=1100, h=350)
+		plot_clonality_case(case, replicate_only=False, w=1050, h=350)
 
 if __name__ == '__main__':
 	main()
