@@ -116,6 +116,7 @@ def organize_files(path):
 		c.ladder = {}
 		c.rox500 = []
 		c.index_of_peaks_to_annotate = {}
+		c.index_of_artifactual_peaks = {}
 		c.index_of_replicate_peaks = {}
 	return cases
 
@@ -306,6 +307,20 @@ def index_of_peaks_to_annotate(case):
 			case.index_of_peaks_to_annotate[ch] = peaks_in_all_roi[:]
 	return case
 
+def find_artifactual_peaks(case):
+	for ch in case.df.columns:
+		if 'channel_3' in ch and 'SCL' not in ch:
+			ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
+			label_name = case.name + '_' + ch
+			ladder = case.ladder[ch_4]
+			peaks_temp, _ = find_peaks(case.df[ch], height=500)
+			peaks_i = []
+			for i in peaks_temp:
+				if i >= ladder[0] and i <= ladder[-1]:
+					peaks_i.append(i)
+			case.index_of_artifactual_peaks[ch] = peaks_i[:]
+	return case
+
 def plot_scl(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' in ch:
 		label_name = case.name + '_' + ch
@@ -378,7 +393,6 @@ def plot_size_standard(case, ch, plot_dict, w, h):
 		p.line(x, y, line_width=0.5, color='red')
 		p.ygrid.visible = False
 		p.x(x_ladder, y_ladder)
-		# print('x={}, y={}'.format(x_ladder, y_ladder))
 		for x,y,label in zip(x_ladder, y_ladder, case.rox500):
 			mytext = Label(angle=1, x=x, y=y, text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
 			p.add_layout(mytext)
@@ -389,13 +403,24 @@ def plot_empty_channel_3(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		ch_3 = re.sub(r'channel_\d', 'channel_3', ch)
+		ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
 		label_name = case.name + '_' + ch_3
-		print(label_name)
 		x = case.df[ch_3].index.to_list()
 		y = case.df[ch_3].to_list()
-		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), tooltips=TOOLTIPS)
+		x_ladder = case.index_of_artifactual_peaks[ch_3]
+		y_ladder = case.df[ch_3][x_ladder].to_list()
+		if len(y_ladder) > 0:
+			p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='channel of artifactual peaks', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, 1.5*max(y_ladder)), tooltips=TOOLTIPS)
+		else:
+			p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='channel of artifactual peaks', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), tooltips=TOOLTIPS)
 		p.line(x, y, line_width=0.5, color='orange')
 		p.ygrid.visible = False
+		# p.x(x_ladder, y_ladder)
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
+		x_fitted = case.df[x_col_name][x_ladder].to_list()
+		for x,y,label in zip(x_ladder, y_ladder, x_fitted):
+			mytext = Label(angle=1, x=x, y=y, text='{:.1f}'.format(label), x_offset=0, y_offset=2, text_font_size='8pt')
+			p.add_layout(mytext)
 		plot_dict[ch_3] = p
 	return plot_dict
 
@@ -479,6 +504,7 @@ def main():
 		print('Processing {}'.format(case_name))
 		case = gather_case_data(case, case_name, path)
 		case = size_standard(case)
+		case = find_artifactual_peaks(case)
 		case = baseline_correction(case)
 		case = pick_peak_one(case)
 		case = make_decay_curve(case)
