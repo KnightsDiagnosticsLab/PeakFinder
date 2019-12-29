@@ -41,22 +41,6 @@ def organize_PTE_files(path):
 		c.rox500 = []
 	return cases
 
-def plot_PTE_case(case, w=1050, h=350):
-	silence(FIXED_SIZING_MODE, True)
-	plot_dict = {}
-	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-	for ch in case.df.columns:
-		ch_num = re.findall(r'channel_\d$', ch)[0]
-		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', x_range=(0,5000), tooltips=TOOLTIPS)
-		x = case.df.index.to_list()
-		y = case.df[ch].to_list()
-		p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
-		plot_dict[ch] = p
-	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
-	# print(type(plot_dict.values()))
-	plots = column([p for p in plot_dict.values()])
-	show(plots)
-
 def plot_all_PTE_cases(cases, w=1050, h=350):
 	silence(FIXED_SIZING_MODE, True)
 	plot_dict = {}
@@ -76,11 +60,33 @@ def plot_all_PTE_cases(cases, w=1050, h=350):
 	plots = column([plot_dict[ch] for ch in sorted(plot_dict)])
 	show(plots)
 
+def plot_PTE_case(case, plot_dict, w=1050, h=350, ss_channel_num=5):
+	silence(FIXED_SIZING_MODE, True)
+	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+	ss_channel = 'channel_' + str(ss_channel_num)
+	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch]
+	for ch in ch_list:
+		ch_num = re.findall(r'channel_\d$', ch)[0]
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ss_channel, ch)
+		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
+		if ss_channel not in ch:
+			p.x_range = Range1d(75,400)
+			x = case.df[x_col_name].to_list()
+			y = case.df[ch].to_list()
+			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
+			plot_dict[ch] = p
+		else:
+			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h, ss_channel_num=5)
+	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
+	# print(type(plot_dict.values()))
+	return plot_dict
+
 def main():
 	owd = os.getcwd()	# original working directory
 	path = os.path.abspath(sys.argv[1])
 	os.chdir(path)
 	cases = organize_PTE_files(path)
+	plot_dict = {}
 	for name, case in cases.items():
 		print('working on {}'.format(case.name))
 		case = gather_PTE_case_data(case, path)
@@ -90,10 +96,20 @@ def main():
 		case = clo.baseline_correction(case, ss_channel_num=5, distance=10)
 		case = clo.size_standard(case, channel='channel_5')
 		case = clo.local_southern(case)
-		# plot_PTE_case(case, w=2000, h=500)
-	plot_all_PTE_cases(cases)
+		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=350)
 
-	
+	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
+	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
+	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
+	plot_keys = [*scl_keys, *plot_keys]
+	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
+
+	case_html = case.name + '.html'
+	output_file(case_html)
+	show(plots)
+	save(plots)
+	print('Saved {}'.format(case_html))
+
 
 if __name__ == '__main__':
 	main()
