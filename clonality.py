@@ -86,14 +86,15 @@ regions_of_interest = {
 channel_colors = {
 	'channel_1':'blue',
 	'channel_2':'green',
-	'channel_3':'orange',
+	'channel_3':'darkorchid',
 	'channel_4':'red',
+	'channel_5':'maroon',
 	'SCL':'black'
 }
 
 def pretty_name(c,t):
 	if 'channel' in c:
-		channel = re.findall(r'channel_\d$', c)[0]
+		channel = re.findall(r'channel_\d', c)[0]
 		if 'repeat' in c:
 			pc = '_'.join([t, channel, 'repeat'])
 		else:
@@ -148,7 +149,7 @@ def gather_case_data(case, case_name, path):
 	return case
 
 def local_southern(case, order=2):
-	for ch_4, ladder in case.ladder.items():
+	for ss_ch, ladder in case.ladder.items():
 		x_fitted = np.array([])
 		for i in range(2,len(ladder)-1):
 			x1 = ladder[i-2:i+1]
@@ -168,7 +169,7 @@ def local_southern(case, order=2):
 			x_fitted = np.concatenate((x_fitted, y), axis=0)
 		x_df = pd.DataFrame(x_fitted)
 		# print('len(x_fitted) = {}'.format(len(x_fitted)))
-		col_name = '_'.join(['x_fitted', ch_4])
+		col_name = '_'.join(['x_fitted', ss_ch])
 		x_df.columns = [col_name]
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return case
@@ -251,23 +252,31 @@ def build_ladder(df, size_standard, label_name):
 			break
 	return ladder
 
-def reduce_choices(df, label_name):
+def reduce_choices(ds, label_name):
+	if label_name == '19KD-140M0048-R_PTE-19-83_C03_x_fitted_19KD-140M0048-R_PTE-19-83_C03.fsa.channel_5':
+		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=1050, height=350)
+		p.line(ds.index.to_list(), ds, line_width=0.5)
+		show(p)
+
 	t = 2.0
-	peaks_x_restricted, _ = find_peaks(df, height=[20,1000], distance=30, width=2)
-	peaks_x, _ = find_peaks(df)
-	coor = [(x,df[x]) for x in peaks_x]
+	# print(ds)
+	peaks_x_restricted, _ = find_peaks(ds, height=[20,1000], distance=30, width=2)
+	peaks_x, _ = find_peaks(ds)
+	coor = [(x,ds[x]) for x in peaks_x]
+	# print('label_name = {}'.format(label_name))
+	# print('coor = {}'.format(coor))
 	tallest = sorted(coor, key=lambda x: x[1])[-1]
 	choices_x = [x for x in peaks_x_restricted if x > tallest[0]]
-	choices_y = [df[x] for x in choices_x]
+	choices_y = [ds[x] for x in choices_x]
 	# choices_y_grubbs = grubbs.test(choices_y, alpha=0.05)
-	# choices_x_reduced = [x for x in choices_x if df[x] in choices_y_grubbs]
+	# choices_x_reduced = [x for x in choices_x if ds[x] in choices_y_grubbs]
 	polyxy = np.poly1d(np.polyfit(choices_x, choices_y, deg=1))
-	# polybaseline = np.poly1d(np.polyfit(df.index.tolist()[choices_x[0]:], df[choices_x[0]:],deg=1))
+	# polybaseline = np.poly1d(np.polyfit(ds.index.tolist()[choices_x[0]:], ds[choices_x[0]:],deg=1))
 	std = np.std(choices_y)
-	std2_below = polyxy(df.index.to_list()) - t*std
-	std2_above = polyxy(df.index.to_list()) + t*std
+	std2_below = polyxy(ds.index.to_list()) - t*std
+	std2_above = polyxy(ds.index.to_list()) + t*std
 	# std2 = [(x1,x2) for x1, x2 in zip(std2_below, std2_above)]
-	peaks_x, _ = find_peaks(df, height=[std2_below, std2_above], prominence=20, width=2)
+	peaks_x, _ = find_peaks(ds, height=[std2_below, std2_above], prominence=20, width=2)
 	choices_x = [x for x in peaks_x if x > tallest[0]]
 	return choices_x, std
 
@@ -279,17 +288,20 @@ def size_standard(case, channel='channel_4'):
 	rox500_75_450 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500 = rox500_75_450
 	case.rox500 = rox500[:]
-	ladder_channels = [ch for ch in case.df.columns if channel in ch]
+	ladder_channels = [ch for ch in case.df.columns if channel in ch and 'x_fitted' not in ch]
+	# print('ladder_channels = {}'.format(ladder_channels))
 	for ch in ladder_channels:
 		label_name = '_'.join([case.name, ch])
 		case.ladder[ch] = build_ladder(case.df[ch], rox500, label_name)
 	return case
 
-def baseline_correction(case, ch_list=None, iterations=3, prominence=1, distance=20):
+def baseline_correction(case, ch_list=None, ss_channel_num=4, iterations=3, prominence=1, distance=20):
 	if ch_list is None:
-		ch_list = case.df.columns
+		ch_list = case.df.columns.to_list()
 	else:
-		ch_list = list(set(case.df.columns) & set(ch_list))
+		ch_list = list(set(case.df.columns.to_list()) & set(ch_list))
+	ss_ch = 'channel_' + str(ss_channel_num)
+	ch_list = [ch for ch in ch_list if ss_ch not in ch]
 	for ch in ch_list:
 		for i in range(0,iterations):
 			_, prop = find_peaks(case.df[ch], prominence=prominence, distance=distance)
@@ -298,12 +310,6 @@ def baseline_correction(case, ch_list=None, iterations=3, prominence=1, distance
 			spl_df = pd.Series(spl(case.df.index.tolist()))
 			case.df[ch] = case.df[ch] - spl_df
 	return case
-
-# def baseline_correction_clonality(case):
-# 	for ch in case.df.columns:
-# 		if ch in channels_of_interest.keys() and 'SCL' not in ch:
-# 			case = baseline_correction(case, ch)
-# 	return case
 
 def index_of_peaks_to_annotate(case):
 	for ch in case.df.columns:
@@ -338,25 +344,27 @@ def find_artifactual_peaks(case):
 
 def plot_scl(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' in ch:
+		ch_num = re.findall(r'channel_\d', ch)[0]
 		label_name = case.name + '_' + ch
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		x = case.df[ch].index.to_list()
 		y = case.df[ch].to_list()
 		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(1000, max(x)), tooltips=TOOLTIPS)
-		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
+		p.line(x, y, line_width=0.5, color=channel_colors.get(ch_num, 'blue'))
 		plot_dict[ch] = p
 	return plot_dict
 
 def plot_channels_of_interest(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
+		ch_num = re.findall(r'channel_\d', ch)[0]
 		label_name = case.name + '_' + ch
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
 		x = case.df[x_col_name].to_list()
 		y = case.df[ch].to_list()
-		p.line(x, y, line_width=0.5, color=channels_of_interest[ch])
+		p.line(x, y, line_width=0.5, color=channel_colors.get(ch_num, 'blue'))
 		plot_dict[ch] = p
 	return plot_dict
 
@@ -394,24 +402,26 @@ def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only):
 			p.add_layout(mytext)
 	return plot_dict
 
-def plot_size_standard(case, ch, plot_dict, w, h):
-	if ch in channels_of_interest.keys() and 'SCL' not in ch:
-		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-		ch_4 = re.sub(r'channel_\d', 'channel_4', ch)
-		label_name = case.name + '_' + ch_4
-		case.df[ch_4].index.rename('x')
-		x = case.df[ch_4].index.to_list()
-		y = case.df[ch_4].to_list()
-		x_ladder = case.ladder[ch_4]
-		y_ladder = case.df[ch_4][x_ladder].to_list()
-		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
-		p.line(x, y, line_width=0.5, color='red')
+def plot_size_standard(case, ch, plot_dict, w, h, ss_channel_num=4):
+	# if ch in channels_of_interest.keys() and 'SCL' not in ch:
+	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+	ss_ch = re.sub(r'channel_\d', 'channel_' + str(ss_channel_num), ch)
+	ch_num = re.findall(r'channel_\d', ch)[0]
+	if ss_ch in case.ladder.keys():
+		label_name = case.name + '_' + ss_ch
+		# case.df[ss_ch].index.rename('x')
+		x = case.df[ss_ch].index.to_list()
+		y = case.df[ss_ch].to_list()
+		x_ladder = case.ladder[ss_ch]
+		y_ladder = case.df[ss_ch][x_ladder].to_list()
+		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(0, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
+		p.line(x, y, line_width=0.5, color=channel_colors.get(ch_num, 'blue'))
 		p.ygrid.visible = False
 		p.x(x_ladder, y_ladder)
 		for x,y,label in zip(x_ladder, y_ladder, case.rox500):
 			mytext = Label(angle=1, x=x, y=y, text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
 			p.add_layout(mytext)
-		plot_dict[ch_4] = p
+		plot_dict[ss_ch] = p
 	return plot_dict
 
 def plot_empty_channel_3(case, ch, plot_dict, w, h):
@@ -424,10 +434,10 @@ def plot_empty_channel_3(case, ch, plot_dict, w, h):
 		x_ladder = case.index_of_artifactual_peaks[ch_3]
 		y_ladder = case.df[ch_3][x_ladder].to_list()
 		if len(y_ladder) > 0:
-			p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='channel of artifactual peaks', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), y_range = (-200, 1.5*max(y_ladder)), tooltips=TOOLTIPS)
+			p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='channel of artifactual peaks', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(0, max(x)), y_range = (-200, 1.5*max(y_ladder)), tooltips=TOOLTIPS)
 		else:
-			p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='channel of artifactual peaks', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(1000, max(x)), tooltips=TOOLTIPS)
-		p.line(x, y, line_width=0.5, color='orange')
+			p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='channel of artifactual peaks', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(0, max(x)), tooltips=TOOLTIPS)
+		p.line(x, y, line_width=0.5, color=channel_colors.get('channel_3', 'blue'))
 		p.ygrid.visible = False
 		# p.x(x_ladder, y_ladder)
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
@@ -517,11 +527,11 @@ def main():
 		case = cases[case_name]
 		print('Processing {}'.format(case_name))
 		case = gather_case_data(case, case_name, path)
-		case = size_standard(case)
+		case = size_standard(case, channel='channel_4')
 		case = find_artifactual_peaks(case)
-		case = baseline_correction(case, channels_of_interest.keys(), distance=10)
-		case = pick_peak_one(case)
-		case = make_decay_curve(case)
+		case = baseline_correction(case, ch_list=channels_of_interest.keys(), distance=10)
+		# case = pick_peak_one(case)
+		# case = make_decay_curve(case)
 		case = local_southern(case)
 		case = index_of_peaks_to_annotate(case)
 		case = replicate_peaks(case)

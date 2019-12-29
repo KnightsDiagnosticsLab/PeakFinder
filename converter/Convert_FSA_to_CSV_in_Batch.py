@@ -39,12 +39,10 @@ def create_dataframe_2(record, keys):
 	Description: Returns a dataframe containing all the data values for FSA/ABI file for 3130 Sequencer.
 	url: https://projects.nfstc.org/workshops/resources/articles/ABIF_File_Format.pdf
 	'''
-	DATA_list = ['DATA1','DATA2','DATA3','DATA4']
-	channels = []
+	DATA_list = ['DATA1','DATA2','DATA3','DATA4','DATA105']
 	cols = [record.name + '.fsa.channel_1', record.name + '.fsa.channel_2', record.name + '.fsa.channel_3', record.name + '.fsa.channel_4']
-	for key in keys:
-		if key in DATA_list:
-			channels.append(record.annotations['abif_raw'][key])
+	channels = [record.annotations['abif_raw'][key] for key in keys if key in DATA_list]
+	cols = [record.name + '.fsa.channel_' + str(i+1) for i in range(len(channels))]
 	df = pd.DataFrame(channels)
 	df = df.T
 	df.columns = cols

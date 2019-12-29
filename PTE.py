@@ -47,11 +47,10 @@ def plot_PTE_case(case, w=1050, h=350):
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	for ch in case.df.columns:
 		ch_num = re.findall(r'channel_\d$', ch)[0]
-		color = clo.channel_colors.get(ch_num, 'blue')
 		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', x_range=(0,5000), tooltips=TOOLTIPS)
 		x = case.df.index.to_list()
 		y = case.df[ch].to_list()
-		p.line(x, y, line_width=0.5, color=color)
+		p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
 		plot_dict[ch] = p
 	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
 	# print(type(plot_dict.values()))
@@ -64,19 +63,18 @@ def plot_all_PTE_cases(cases, w=1050, h=350):
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	for case in cases.values():
 		for ch in case.df.columns:
-			ch_num = re.findall(r'channel_\d$', ch)[0]
-			color = clo.channel_colors.get(ch_num, 'blue')
-			p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS, x_range=(1000,5000))
-			
-			x = case.df.index.to_list()
-			y = case.df[ch].to_list()
-			p.line(x, y, line_width=0.5, color=color)
-			plot_dict[ch] = p
-		# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
-		# print(type(plot_dict.values()))
+			if 'channel_5' in ch:
+				# print(ch)
+				plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h, ss_channel_num=5)
+			else:
+				ch_num = re.findall(r'channel_\d$', ch)[0]
+				p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS, x_range=(1000,5000))
+				x = case.df.index.to_list()
+				y = case.df[ch].to_list()
+				p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
+				plot_dict[ch] = p
 	plots = column([plot_dict[ch] for ch in sorted(plot_dict)])
 	show(plots)
-
 
 def main():
 	owd = os.getcwd()	# original working directory
@@ -87,8 +85,11 @@ def main():
 		print('working on {}'.format(case.name))
 		case = gather_PTE_case_data(case, path)
 		# print(case.df)
-		for ch in case.df.columns:
-			case = clo.baseline_correction(case, ch, distance=1)
+		# for ch in case.df.columns:
+		# 	case = clo.baseline_correction(case, ch, distance=1)
+		case = clo.baseline_correction(case, ss_channel_num=5, distance=10)
+		case = clo.size_standard(case, channel='channel_5')
+		case = clo.local_southern(case)
 		# plot_PTE_case(case, w=2000, h=500)
 	plot_all_PTE_cases(cases)
 
