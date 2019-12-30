@@ -280,7 +280,7 @@ def reduce_choices(ds, label_name):
 	choices_x = [x for x in peaks_x if x > tallest[0]]
 	return choices_x, std
 
-def size_standard(case, channel='channel_4'):
+def size_standard(case, ch_ss_num=4):
 	rox500_16 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450, 490, 500]
 	rox500_14 = [35, 50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500_13 = [50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
@@ -288,6 +288,7 @@ def size_standard(case, channel='channel_4'):
 	rox500_75_450 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500 = rox500_75_450
 	case.rox500 = rox500[:]
+	ch_ss = 'channel_'+str(ch_ss_num)
 	ladder_channels = [ch for ch in case.df.columns if channel in ch and 'x_fitted' not in ch]
 	# print('ladder_channels = {}'.format(ladder_channels))
 	for ch in ladder_channels:
@@ -527,7 +528,7 @@ def main():
 		case = cases[case_name]
 		print('Processing {}'.format(case_name))
 		case = gather_case_data(case, case_name, path)
-		case = size_standard(case, channel='channel_4')
+		case = size_standard(case, ch_ss_num=4)
 		case = find_artifactual_peaks(case)
 		case = baseline_correction(case, ch_list=channels_of_interest.keys(), distance=10)
 		# case = pick_peak_one(case)
