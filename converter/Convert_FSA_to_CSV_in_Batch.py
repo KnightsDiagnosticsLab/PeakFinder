@@ -40,7 +40,7 @@ def create_dataframe_2(record, keys):
 	url: https://projects.nfstc.org/workshops/resources/articles/ABIF_File_Format.pdf
 	'''
 	DATA_list = ['DATA1','DATA2','DATA3','DATA4','DATA105']
-	cols = [record.name + '.fsa.channel_1', record.name + '.fsa.channel_2', record.name + '.fsa.channel_3', record.name + '.fsa.channel_4']
+	# cols = [record.name + '.fsa.channel_1', record.name + '.fsa.channel_2', record.name + '.fsa.channel_3', record.name + '.fsa.channel_4']
 	channels = [record.annotations['abif_raw'][key] for key in keys if key in DATA_list]
 	cols = [record.name + '.fsa.channel_' + str(i+1) for i in range(len(channels))]
 	df = pd.DataFrame(channels)
