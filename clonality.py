@@ -295,12 +295,12 @@ def size_standard(case, channel='channel_4'):
 		case.ladder[ch] = build_ladder(case.df[ch], rox500, label_name)
 	return case
 
-def baseline_correction(case, ch_list=None, ss_channel_num=4, iterations=3, prominence=1, distance=20):
+def baseline_correction(case, ch_list=None, ch_ss_num=4, iterations=3, prominence=1, distance=20):
 	if ch_list is None:
 		ch_list = case.df.columns.to_list()
 	else:
 		ch_list = list(set(case.df.columns.to_list()) & set(ch_list))
-	ss_ch = 'channel_' + str(ss_channel_num)
+	ss_ch = 'channel_' + str(ch_ss_num)
 	ch_list = [ch for ch in ch_list if ss_ch not in ch]
 	for ch in ch_list:
 		for i in range(0,iterations):
@@ -355,12 +355,12 @@ def plot_scl(case, ch, plot_dict, w, h):
 		plot_dict[ch] = p
 	return plot_dict
 
-def plot_channels_of_interest(case, ch, plot_dict, w, h, ss_channel_num=4):
+def plot_channels_of_interest(case, ch, plot_dict, w, h, ch_ss_num=4):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
 		ch_num = re.findall(r'channel_\d', ch)[0]
 		label_name = case.name + '_' + ch
 		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_'+str(ss_channel_num), ch)
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_'+str(ch_ss_num), ch)
 		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
 		x = case.df[x_col_name].to_list()
 		y = case.df[ch].to_list()
@@ -382,9 +382,9 @@ def highlight_regions_of_interest(case, ch, plot_dict, w, h):
 		plot_dict[ch] = p
 	return plot_dict
 
-def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only, ss_channel_num=4):
+def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only, ch_ss_num=4):
 	if ch in regions_of_interest.keys():
-		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_'+str(ss_channel_num), ch)
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_'+str(ch_ss_num), ch)
 		p = plot_dict[ch]
 		if replicate_only:
 			peaks_index = case.index_of_replicate_peaks[ch]
@@ -402,10 +402,10 @@ def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only, ss_channel
 			p.add_layout(mytext)
 	return plot_dict
 
-def plot_size_standard(case, ch, plot_dict, w, h, ss_channel_num=4):
+def plot_size_standard(case, ch, plot_dict, w, h, ch_ss_num=4):
 	# if ch in channels_of_interest.keys() and 'SCL' not in ch:
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-	ss_ch = re.sub(r'channel_\d', 'channel_' + str(ss_channel_num), ch)
+	ss_ch = re.sub(r'channel_\d', 'channel_' + str(ch_ss_num), ch)
 	ch_num = re.findall(r'channel_\d', ch)[0]
 	if ss_ch in case.ladder.keys():
 		label_name = case.name + '_' + ss_ch

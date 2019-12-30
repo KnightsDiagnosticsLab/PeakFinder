@@ -49,7 +49,7 @@ def plot_all_PTE_cases(cases, w=1050, h=350):
 		for ch in case.df.columns:
 			if 'channel_5' in ch:
 				# print(ch)
-				plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h, ss_channel_num=5)
+				plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h, ch_ss_num=5)
 			else:
 				ch_num = re.findall(r'channel_\d$', ch)[0]
 				p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS, x_range=(1000,5000))
@@ -60,26 +60,54 @@ def plot_all_PTE_cases(cases, w=1050, h=350):
 	plots = column([plot_dict[ch] for ch in sorted(plot_dict)])
 	show(plots)
 
-def plot_PTE_case(case, plot_dict, w=1050, h=200, ss_channel_num=5):
+def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 	silence(FIXED_SIZING_MODE, True)
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
-	ss_channel = 'channel_' + str(ss_channel_num)
+	ch_ss = 'channel_' + str(ch_ss_num)
 	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch]
 	for ch in ch_list:
 		ch_num = re.findall(r'channel_\d$', ch)[0]
-		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ss_channel, ch)
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ch_ss, ch)
 		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
-		if ss_channel not in ch:
+		if ch_ss not in ch:
 			p.x_range = Range1d(75,400)
 			x = case.df[x_col_name].to_list()
 			y = case.df[ch].to_list()
 			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
 			plot_dict[ch] = p
 		else:
-			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ss_channel_num=5)
+			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ch_ss_num=5)
 	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
 	# print(type(plot_dict.values()))
 	return plot_dict
+
+def label_allelic_ladder(case, w=1500, h=400, ch_ss_num=5):
+	silence(FIXED_SIZING_MODE, True)
+	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+	if case.name == 'AllelicLad_PTE-19-157_D07':
+		print('found AllelicLad_PTE-19-157_D07')
+		ch = 'AllelicLad_PTE-19-157_D07.fsa.channel_1'
+		ch_ss = 'channel_' + str(ch_ss_num)
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ch_ss, ch)
+		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
+		p.x_range = Range1d(75,400)
+		peaks_i, _ = find_peaks(case.df[ch], height=100)
+		peaks_i = [i for i in peaks_i if case.df[x_col_name][i] >= 120 and case.df[x_col_name][i] <= 180]
+		x = case.df[x_col_name].to_list()
+		y = case.df[ch].to_list()
+		p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_ss_num, 'blue'))
+		p.x(case.df[x_col_name][peaks_i], case.df[ch][peaks_i], color='red')
+		show(p)
+	return case
+
+alleles = {
+	'D8S1179':{
+		'chromsome location':8,
+		'allelic ladder': [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+		'dye label': '6-FAM',
+		'control DNA 9947A':[13,13]
+	}
+}
 
 def main():
 	owd = os.getcwd()	# original working directory
@@ -93,22 +121,23 @@ def main():
 		# print(case.df)
 		# for ch in case.df.columns:
 		# 	case = clo.baseline_correction(case, ch, distance=1)
-		case = clo.baseline_correction(case, ss_channel_num=5, distance=5)
+		case = clo.baseline_correction(case, ch_ss_num=5, distance=5)
 		case = clo.size_standard(case, channel='channel_5')
 		case = clo.local_southern(case)
-		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=200)
+		case = label_allelic_ladder(case, ch_ss_num=5)
+	# 	plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=200)
 
-	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
-	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
-	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
-	plot_keys = [*scl_keys, *plot_keys]
-	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
+	# # sort the plots. SCL first, channel + repeat after, followed by their size standards.
+	# plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
+	# scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
+	# plot_keys = [*scl_keys, *plot_keys]
+	# plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
 
-	case_html = case.name + '.html'
-	output_file(case_html)
-	show(plots)
-	save(plots)
-	print('Saved {}'.format(case_html))
+	# case_html = case.name + '.html'
+	# output_file(case_html)
+	# show(plots)
+	# save(plots)
+	# print('Saved {}'.format(case_html))
 
 
 if __name__ == '__main__':
