@@ -60,7 +60,7 @@ def plot_all_PTE_cases(cases, w=1050, h=350):
 	plots = column([plot_dict[ch] for ch in sorted(plot_dict)])
 	show(plots)
 
-def plot_PTE_case(case, plot_dict, w=1050, h=350, ss_channel_num=5):
+def plot_PTE_case(case, plot_dict, w=1050, h=200, ss_channel_num=5):
 	silence(FIXED_SIZING_MODE, True)
 	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	ss_channel = 'channel_' + str(ss_channel_num)
@@ -76,7 +76,7 @@ def plot_PTE_case(case, plot_dict, w=1050, h=350, ss_channel_num=5):
 			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
 			plot_dict[ch] = p
 		else:
-			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h, ss_channel_num=5)
+			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ss_channel_num=5)
 	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
 	# print(type(plot_dict.values()))
 	return plot_dict
@@ -93,10 +93,10 @@ def main():
 		# print(case.df)
 		# for ch in case.df.columns:
 		# 	case = clo.baseline_correction(case, ch, distance=1)
-		case = clo.baseline_correction(case, ss_channel_num=5, distance=10)
+		case = clo.baseline_correction(case, ss_channel_num=5, distance=5)
 		case = clo.size_standard(case, channel='channel_5')
 		case = clo.local_southern(case)
-		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=350)
+		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=200)
 
 	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
 	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
@@ -113,3 +113,13 @@ def main():
 
 if __name__ == '__main__':
 	main()
+
+
+"""	Next steps
+	1. Correctly label regions and peaks on the allelic ladder.
+	2. Use allelic ladder to annotate sample peaks.
+		a. May need to deal with stutter vs. true allelic peak
+	3. Get area under each peak.
+		a. Given a list of peaks, get their bases.
+		b. Include stutter in area calculation or not? Won't matter so long as we are consistent. Easier to exclude stutter.
+"""
