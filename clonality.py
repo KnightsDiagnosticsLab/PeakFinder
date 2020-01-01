@@ -18,6 +18,9 @@ from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 from bokeh.core.validation import silence
 
+TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
+silence(FIXED_SIZING_MODE, True)
+
 channels_of_interest = {
 			'IGH-A_channel_1':'blue',
 			'IGH-B_channel_1':'blue',
@@ -86,9 +89,9 @@ regions_of_interest = {
 channel_colors = {
 	'channel_1':'blue',
 	'channel_2':'green',
-	'channel_3':'darkorchid',
+	'channel_3':'purple',
 	'channel_4':'red',
-	'channel_5':'maroon',
+	'channel_5':'darkgoldenrod',
 	'SCL':'black'
 }
 
@@ -123,16 +126,28 @@ def organize_clonality_files(path):
 	for case_name,c in cases.items():
 		c.name = case_name
 		c.files = cd[case_name]
-		c.ladder = {}
-		c.rox500 = []
-		c.index_of_peaks_to_annotate = {}
-		c.index_of_artifactual_peaks = {}
-		c.index_of_replicate_peaks = {}
+		# c.ladder = {}
+		# c.rox500 = []
+		# c.index_of_peaks_to_annotate = {}
+		# c.index_of_artifactual_peaks = {}
+		# c.index_of_replicate_peaks = {}
+		# c.allelic_ladder = None
+		# c.plot_labels = {}
 	return cases
 
 class Case(object):
 	"""	I'm sure there's a better way than making a dummy class like this.
 	"""
+	def __init__(self):
+		self.name = None
+		self.files = {}
+		self.ladder = {}
+		self.rox500 = []
+		self.index_of_peaks_to_annotate = {}
+		self.index_of_artifactual_peaks = {}
+		self.index_of_replicate_peaks = {}
+		self.allelic_ladder = None
+		self.plot_labels = {}
 	pass
 
 def gather_case_data(case, case_name, path):
@@ -253,11 +268,6 @@ def build_ladder(df, size_standard, label_name):
 	return ladder
 
 def reduce_choices(ds, label_name):
-	if label_name == '19KD-140M0048-R_PTE-19-83_C03_x_fitted_19KD-140M0048-R_PTE-19-83_C03.fsa.channel_5':
-		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=1050, height=350)
-		p.line(ds.index.to_list(), ds, line_width=0.5)
-		show(p)
-
 	t = 2.0
 	# print(ds)
 	peaks_x_restricted, _ = find_peaks(ds, height=[20,1000], distance=30, width=2)
@@ -286,10 +296,10 @@ def size_standard(case, ch_ss_num=4):
 	rox500_13 = [50, 75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
 	rox500_75_400 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400]
 	rox500_75_450 = [75, 100, 139, 150, 160, 200, 250, 300, 340, 350, 400, 450]
-	rox500 = rox500_75_450
+	rox500 = rox500_75_400
 	case.rox500 = rox500[:]
 	ch_ss = 'channel_'+str(ch_ss_num)
-	ladder_channels = [ch for ch in case.df.columns if channel in ch and 'x_fitted' not in ch]
+	ladder_channels = [ch for ch in case.df.columns if ch_ss in ch and 'x_fitted' not in ch]
 	# print('ladder_channels = {}'.format(ladder_channels))
 	for ch in ladder_channels:
 		label_name = '_'.join([case.name, ch])
@@ -347,7 +357,6 @@ def plot_scl(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' in ch:
 		ch_num = re.findall(r'channel_\d', ch)[0]
 		label_name = case.name + '_' + ch
-		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
 		x = case.df[ch].index.to_list()
 		y = case.df[ch].to_list()
@@ -360,7 +369,6 @@ def plot_channels_of_interest(case, ch, plot_dict, w, h, ch_ss_num=4):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
 		ch_num = re.findall(r'channel_\d', ch)[0]
 		label_name = case.name + '_' + ch
-		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_'+str(ch_ss_num), ch)
 		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='fragment size', y_axis_label='RFU', width=w, height=h, x_range=(75,400), tooltips=TOOLTIPS)
 		x = case.df[x_col_name].to_list()
@@ -405,7 +413,6 @@ def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only, ch_ss_num=
 
 def plot_size_standard(case, ch, plot_dict, w, h, ch_ss_num=4):
 	# if ch in channels_of_interest.keys() and 'SCL' not in ch:
-	TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 	ss_ch = re.sub(r'channel_\d', 'channel_' + str(ch_ss_num), ch)
 	ch_num = re.findall(r'channel_\d', ch)[0]
 	if ss_ch in case.ladder.keys():
@@ -427,7 +434,6 @@ def plot_size_standard(case, ch, plot_dict, w, h, ch_ss_num=4):
 
 def plot_empty_channel_3(case, ch, plot_dict, w, h):
 	if ch in channels_of_interest.keys() and 'SCL' not in ch:
-		TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 		ch_3 = re.sub(r'channel_\d', 'channel_3', ch)
 		label_name = case.name + '_' + ch_3
 		x = case.df[ch_3].index.to_list()
