@@ -69,19 +69,15 @@ def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 	# print(type(plot_dict.values()))
 	return plot_dict
 
-def label_allelic_ladder(case, w=900, h=400, ch_ss_num=5):
-	if 'Allelic' in case.name:
-		print("CONTINUE FROM HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-	return case
-
 def find_peaks_in_range(case, ch, x_col_name, start, end, h=100, d=10):
 	peaks, _ = find_peaks(case.df[ch], height=h, distance=d)
 	peaks = [i for i in peaks if case.df[x_col_name][i] >= start and case.df[x_col_name][i] <= end]
 	# print('\tlen(peaks) = {}'.format(len(peaks)))
 	return peaks
 
-def build_allelic_ladder(case, plot_dict, ch_ss_num=5):
+def build_allelic_ladder(case, plot_dict, allelic_case_names, ch_ss_num=5):
 	if 'Allelic' in case.name:
+		allelic_case_names.append(case.name)
 		ch_ss = 'channel_' + str(ch_ss_num)
 		channels = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch_ss not in ch]
 		x_col_name = [ch for ch in case.df.columns if 'x_fitted' in ch][0]
@@ -133,8 +129,68 @@ def build_allelic_ladder(case, plot_dict, ch_ss_num=5):
 			plot_dict[ch] = p
 		# plots = column(plot_list)
 		# show(plots)
-	return case, plot_dict
+	return case, plot_dict, allelic_case_names
 
+def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
+	# print(case.name)
+	pte_run = re.findall(r'PTE-\d+-\d+', case.name)[0]
+	ch_ss = 'channel_' + str(ch_ss_num)
+	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch_ss not in ch]
+
+	for ch in ch_list:
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ch_ss, ch)
+		ch_num = re.findall(r'channel_\d$', ch)[0]
+		ch_allelic = [ch_a for ch_a in allelic_case.df.columns if ch_num in ch_a][0]
+		peaks = find_peaks_in_range(case, ch, x_col_name, 75, 400, h=100, d=5)
+		
+		# print('\tch = {}, ch_allelic = {}'.format(ch, ch_allelic))
+		# print(allelic_case.plot_labels[ch_allelic])
+
+	return case
+
+def main():
+	owd = os.getcwd()	# original working directory
+	path = os.path.abspath(sys.argv[1])
+	os.chdir(path)
+	cases = organize_PTE_files(path)
+	plot_dict = {}
+	allelic_case_names = []
+
+	for case in cases.values():
+		print('working on {}'.format(case.name))
+		case = gather_PTE_case_data(case, path)
+		case = clo.baseline_correction(case, ch_ss_num=5, distance=20)
+		case = clo.size_standard(case, ch_ss_num=5)
+		case = clo.local_southern(case)
+		case, plot_dict, allelic_case_names = build_allelic_ladder(case, plot_dict, allelic_case_names, ch_ss_num=5)
+		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=200)
+
+	allelic_case = cases[allelic_case_names[0]]
+	non_allelic_case_names = [case_name for case_name,case in cases.items() if 'Allelic' not in case_name]
+	for case_name in non_allelic_case_names:
+		case = cases[case_name]
+		case = label_allelic_ladder(case, allelic_case, ch_ss_num=5)
+
+	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
+	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
+	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
+	plot_keys = [*scl_keys, *plot_keys]
+	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
+
+	case_html = case.name + '.html'
+	# output_file(case_html)
+	# show(plots)
+	# save(plots)
+	# print('Saved {}'.format(case_html))
+
+"""	Next steps
+	1. Correctly label regions and peaks on the allelic ladder.
+	2. Use allelic ladder to annotate sample peaks.
+		a. May need to deal with stutter vs. true allelic peak
+	3. Get area under each peak.
+		a. Given a list of peaks, get their bases.
+		b. Include stutter in area calculation or not? Won't matter so long as we are consistent. Easier to exclude stutter.
+"""
 
 alleles = {
 	'channel_1': {
@@ -283,49 +339,5 @@ alleles = {
 	}
 }
 
-
-
-def main():
-	owd = os.getcwd()	# original working directory
-	path = os.path.abspath(sys.argv[1])
-	os.chdir(path)
-	cases = organize_PTE_files(path)
-	plot_dict = {}
-
-	for case in cases.values():
-		print('working on {}'.format(case.name))
-		case = gather_PTE_case_data(case, path)
-		case = clo.baseline_correction(case, ch_ss_num=5, distance=20)
-		case = clo.size_standard(case, ch_ss_num=5)
-		case = clo.local_southern(case)
-		case, plot_dict = build_allelic_ladder(case, plot_dict, ch_ss_num=5)
-		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=200)
-
-	for case in cases.values():
-		case = label_allelic_ladder(case, ch_ss_num=5)
-
-	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
-	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
-	scl_keys = sorted([key for key in plot_dict.keys() if 'SCL' in key])
-	plot_keys = [*scl_keys, *plot_keys]
-	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
-
-	case_html = case.name + '.html'
-	output_file(case_html)
-	show(plots)
-	save(plots)
-	print('Saved {}'.format(case_html))
-
-
 if __name__ == '__main__':
 	main()
-
-
-"""	Next steps
-	1. Correctly label regions and peaks on the allelic ladder.
-	2. Use allelic ladder to annotate sample peaks.
-		a. May need to deal with stutter vs. true allelic peak
-	3. Get area under each peak.
-		a. Given a list of peaks, get their bases.
-		b. Include stutter in area calculation or not? Won't matter so long as we are consistent. Easier to exclude stutter.
-"""
