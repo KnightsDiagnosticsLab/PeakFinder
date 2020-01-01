@@ -75,7 +75,7 @@ def find_peaks_in_range(case, ch, x_col_name, start, end, h=100, d=10):
 	# print('\tlen(peaks) = {}'.format(len(peaks)))
 	return peaks
 
-def build_allelic_ladder(case, plot_dict, allelic_case_names, ch_ss_num=5):
+def build_allelic_ladder(case, allelic_case_names, ch_ss_num=5):
 	if 'Allelic' in case.name:
 		allelic_case_names.append(case.name)
 		ch_ss = 'channel_' + str(ch_ss_num)
@@ -83,12 +83,12 @@ def build_allelic_ladder(case, plot_dict, allelic_case_names, ch_ss_num=5):
 		x_col_name = [ch for ch in case.df.columns if 'x_fitted' in ch][0]
 		for ch in channels:
 			ch_num = re.findall(r'channel_\d$', ch)[0]
-			p = figure(tools='pan,wheel_zoom,reset',title=ch, width=1050, height=400, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
-			p.x_range = Range1d(75,400)
+			# p = figure(tools='pan,wheel_zoom,reset',title=ch, width=1050, height=400, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
+			# p.x_range = Range1d(75,400)
 			x = case.df[x_col_name].to_list()
 			y = case.df[ch].to_list()
-			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
-			print(ch)
+			# p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
+			# print(ch)
 			for region in alleles[ch_num].keys():
 				start, end = alleles[ch_num][region]['range']
 				stock_ladder = alleles[ch_num][region]['stock ladder']
@@ -126,10 +126,9 @@ def build_allelic_ladder(case, plot_dict, allelic_case_names, ch_ss_num=5):
 				plot_labels.extend([(x,y,label) for x,y,label in zip(x_peaks,y_peaks,allelic_labels)])
 				# print('plot_labels_new = {}'.format(len(plot_labels)))
 				case.plot_labels[ch] = plot_labels
-			plot_dict[ch] = p
 		# plots = column(plot_list)
 		# show(plots)
-	return case, plot_dict, allelic_case_names
+	return case, allelic_case_names
 
 def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 	# print(case.name)
@@ -138,11 +137,21 @@ def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch_ss not in ch]
 
 	for ch in ch_list:
+		plot_label = []
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ch_ss, ch)
 		ch_num = re.findall(r'channel_\d$', ch)[0]
 		ch_allelic = [ch_a for ch_a in allelic_case.df.columns if ch_num in ch_a][0]
-		peaks = find_peaks_in_range(case, ch, x_col_name, 75, 400, h=100, d=5)
-		
+		peaks_i, props = find_peaks(case.df[ch], height=100, prominence=100, distance=10)
+		left_bases = props['left_bases']
+		right_bases = props['right_bases']
+		peaks_x = case.df[x_col_name][peaks_i].to_list()
+		peaks_y = case.df[ch][peaks_i].to_list()
+		allelic_ladder = allelic_case.plot_labels[ch_allelic]
+		for i,x,y,lb,rb in zip(peaks_i,peaks_x,peaks_y,left_bases,right_bases):
+			for a,b,label in allelic_ladder:
+				if abs(x-a) < 1:
+					plot_label.append((x,y,label))
+		case.plot_labels[ch] = plot_label
 		# print('\tch = {}, ch_allelic = {}'.format(ch, ch_allelic))
 		# print(allelic_case.plot_labels[ch_allelic])
 
@@ -159,17 +168,19 @@ def main():
 	for case in cases.values():
 		print('working on {}'.format(case.name))
 		case = gather_PTE_case_data(case, path)
-		case = clo.baseline_correction(case, ch_ss_num=5, distance=20)
+		case = clo.baseline_correction(case, ch_ss_num=5, distance=5, iterations=5)
 		case = clo.size_standard(case, ch_ss_num=5)
 		case = clo.local_southern(case)
-		case, plot_dict, allelic_case_names = build_allelic_ladder(case, plot_dict, allelic_case_names, ch_ss_num=5)
-		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=200)
+		case, allelic_case_names = build_allelic_ladder(case, allelic_case_names, ch_ss_num=5)
 
 	allelic_case = cases[allelic_case_names[0]]
 	non_allelic_case_names = [case_name for case_name,case in cases.items() if 'Allelic' not in case_name]
 	for case_name in non_allelic_case_names:
 		case = cases[case_name]
 		case = label_allelic_ladder(case, allelic_case, ch_ss_num=5)
+
+	for case in cases.values():
+		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=500)
 
 	# sort the plots. SCL first, channel + repeat after, followed by their size standards.
 	plot_keys = sorted([key for key in plot_dict.keys() if 'SCL' not in key])
@@ -178,10 +189,10 @@ def main():
 	plots = column([plot_dict[ch] for ch in plot_keys], sizing_mode='fixed')
 
 	case_html = case.name + '.html'
-	# output_file(case_html)
-	# show(plots)
-	# save(plots)
-	# print('Saved {}'.format(case_html))
+	output_file(case_html)
+	show(plots)
+	save(plots)
+	print('Saved {}'.format(case_html))
 
 """	Next steps
 	1. Correctly label regions and peaks on the allelic ladder.
