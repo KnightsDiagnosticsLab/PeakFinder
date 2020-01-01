@@ -7,7 +7,7 @@ import re
 import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks, peak_prominences, peak_widths
-from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
 from itertools import combinations
 from outliers import smirnov_grubbs as grubbs
 
@@ -164,7 +164,7 @@ def gather_case_data(case, case_name, path):
 	return case
 
 def local_southern(case, order=2):
-	for ss_ch, ladder in case.ladder.items():
+	for ch_ss, ladder in case.ladder.items():
 		x_fitted = np.array([])
 		for i in range(2,len(ladder)-1):
 			x1 = ladder[i-2:i+1]
@@ -184,7 +184,7 @@ def local_southern(case, order=2):
 			x_fitted = np.concatenate((x_fitted, y), axis=0)
 		x_df = pd.DataFrame(x_fitted)
 		# print('len(x_fitted) = {}'.format(len(x_fitted)))
-		col_name = '_'.join(['x_fitted', ss_ch])
+		col_name = '_'.join(['x_fitted', ch_ss])
 		x_df.columns = [col_name]
 		case.df = pd.concat([case.df, x_df], axis=1, sort=False)
 	return case
@@ -306,18 +306,43 @@ def size_standard(case, ch_ss_num=4):
 		case.ladder[ch] = build_ladder(case.df[ch], rox500, label_name)
 	return case
 
-def baseline_correction(case, ch_list=None, ch_ss_num=4, iterations=3, prominence=1, distance=20):
+def baseline_correction_simple(case, ch_list=None, ch_ss_num=4):
 	if ch_list is None:
 		ch_list = case.df.columns.to_list()
 	else:
 		ch_list = list(set(case.df.columns.to_list()) & set(ch_list))
-	ss_ch = 'channel_' + str(ch_ss_num)
-	ch_list = [ch for ch in ch_list if ss_ch not in ch]
+	ch_ss = 'channel_' + str(ch_ss_num)
+	ch_list = [ch for ch in ch_list if ch_ss not in ch]
+	for ch in ch_list:
+		peaks_i, props = find_peaks(case.df[ch], prominence=50)
+		I = case.df.index.to_list()
+		right_bases = props['right_bases']
+		left_bases = props['left_bases']
+		I_exclude = set()
+		for l,r in zip(left_bases, right_bases):
+			I_exclude.update(set(range(l,r)))
+		I = [i for i in I if i not in I_exclude]
+		x_baseline = case.df[ch][I].to_list()
+		# x_avg = mean(x_baseline)
+		polyxy = np.poly1d(np.polyfit(I, x_baseline, deg=1))
+		case.df[ch] = case.df[ch] - polyxy(case.df.index.to_list())
+	case.df = case.df.where(case.df > 0, 0)
+	return case
+
+def baseline_correction_advanced(case, ch_list=None, ch_ss_num=4, iterations=3, prominence=1, distance=20):
+	if ch_list is None:
+		ch_list = case.df.columns.to_list()
+	else:
+		ch_list = list(set(case.df.columns.to_list()) & set(ch_list))
+	ch_ss = 'channel_' + str(ch_ss_num)
+	ch_list = [ch for ch in ch_list if ch_ss not in ch]
 	for ch in ch_list:
 		for i in range(0,iterations):
-			_, prop = find_peaks(case.df[ch], prominence=prominence, distance=distance)
-			bases = sorted(list(set(np.concatenate([prop['left_bases'], prop['right_bases']]))))
+			_, props = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+			bases = sorted(list(set(np.concatenate([props['left_bases'], props['right_bases']]))))
+			# bases = [b for b in bases if b >=0]
 			spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
+			# spl = interp1d(bases, case.df[ch][bases], fill_value='extrapolate')
 			spl_df = pd.Series(spl(case.df.index.tolist()))
 			case.df[ch] = case.df[ch] - spl_df
 	return case
@@ -413,15 +438,15 @@ def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only, ch_ss_num=
 
 def plot_size_standard(case, ch, plot_dict, w, h, ch_ss_num=4):
 	# if ch in channels_of_interest.keys() and 'SCL' not in ch:
-	ss_ch = re.sub(r'channel_\d', 'channel_' + str(ch_ss_num), ch)
+	ch_ss = re.sub(r'channel_\d', 'channel_' + str(ch_ss_num), ch)
 	ch_num = re.findall(r'channel_\d', ch)[0]
-	if ss_ch in case.ladder.keys():
-		label_name = case.name + '_' + ss_ch
-		# case.df[ss_ch].index.rename('x')
-		x = case.df[ss_ch].index.to_list()
-		y = case.df[ss_ch].to_list()
-		x_ladder = case.ladder[ss_ch]
-		y_ladder = case.df[ss_ch][x_ladder].to_list()
+	if ch_ss in case.ladder.keys():
+		label_name = case.name + '_' + ch_ss
+		# case.df[ch_ss].index.rename('x')
+		x = case.df[ch_ss].index.to_list()
+		y = case.df[ch_ss].to_list()
+		x_ladder = case.ladder[ch_ss]
+		y_ladder = case.df[ch_ss][x_ladder].to_list()
 		p = figure(tools='pan,wheel_zoom,reset',title=label_name, x_axis_label='size standard', y_axis_label='RFU', width=w, height=int(h/2.0), x_range=(0, max(x)), y_range = (-200, max(y_ladder)+200), tooltips=TOOLTIPS)
 		p.line(x, y, line_width=0.5, color=channel_colors.get(ch_num, 'blue'))
 		p.ygrid.visible = False
@@ -429,7 +454,7 @@ def plot_size_standard(case, ch, plot_dict, w, h, ch_ss_num=4):
 		for x,y,label in zip(x_ladder, y_ladder, case.rox500):
 			mytext = Label(angle=1, x=x, y=y, text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
 			p.add_layout(mytext)
-		plot_dict[ss_ch] = p
+		plot_dict[ch_ss] = p
 	return plot_dict
 
 def plot_empty_channel_3(case, ch, plot_dict, w, h):
@@ -536,7 +561,8 @@ def main():
 		case = gather_case_data(case, case_name, path)
 		case = size_standard(case, ch_ss_num=4)
 		case = find_artifactual_peaks(case)
-		case = baseline_correction(case, ch_list=channels_of_interest.keys(), distance=10)
+		# case = baseline_correction_simple(case)
+		case = baseline_correction_advanced(case, ch_list=channels_of_interest.keys(), distance=10)
 		# case = pick_peak_one(case)
 		# case = make_decay_curve(case)
 		case = local_southern(case)

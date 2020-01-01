@@ -13,8 +13,8 @@ from outliers import smirnov_grubbs as grubbs
 
 from bokeh.io import output_file, show, save
 from bokeh.layouts import column
-from bokeh.plotting import figure
-from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, LegendItem, Legend
+from bokeh.plotting import figure, ColumnDataSource
+from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, LegendItem, Legend, LabelSet
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 from bokeh.core.validation import silence
 
@@ -57,11 +57,26 @@ def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
 			# print('ch = {}'.format(ch))
 			# print('case.plot_labels.get(ch,[]) = {}'.format(case.plot_labels.get(ch,[])))
-			for x,y,label in case.plot_labels.get(ch,[]):
-				# print(x,y,label)
-				p.x(x, y)
-				mytext = Label(angle=1, x=x, y=int(y), text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
-				p.add_layout(mytext)
+			source = pd.DataFrame.from_records(case.plot_labels.get(ch,[]), columns=['x','y','label'])
+			labels = LabelSet(
+				angle=1,
+				x='x',
+				y='y',
+				text='label',
+				x_offset=0,
+				y_offset=2,
+				source=ColumnDataSource(source),
+				render_mode='canvas',
+				text_font_size='10pt'
+			)
+			p.add_layout(labels)
+			# for x,y,label in case.plot_labels.get(ch,[]):
+			# 	# print(x,y,label)
+			# 	# print('x = {}'.format(x))
+			# 	p.x(x, y)
+			# 	mytext = Label(angle=1, x=x, y=int(y), text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
+			# 	p.add_layout(mytext)
+
 			plot_dict[ch] = p
 		else:
 			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ch_ss_num=5)
@@ -147,13 +162,29 @@ def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 		peaks_x = case.df[x_col_name][peaks_i].to_list()
 		peaks_y = case.df[ch][peaks_i].to_list()
 		allelic_ladder = allelic_case.plot_labels[ch_allelic]
-		for i,x,y,lb,rb in zip(peaks_i,peaks_x,peaks_y,left_bases,right_bases):
-			for a,b,label in allelic_ladder:
-				if abs(x-a) < 1:
-					plot_label.append((x,y,label))
+		
+		# broadcast subtraction
+		X = np.matrix(peaks_x).T
+		XI = np.matrix(peaks_i).T
+		Y = np.matrix(peaks_y).T
+		# print('X = {}'.format(X))
+		A = np.matrix([a for a,_,_ in allelic_ladder])
+		# print('A = {}'.format(A))
+		R = np.absolute(X-A)
+		# print('R = {}'.format(R))
+		IJ = np.nonzero(R<1.0)
+		I = IJ[0]
+		J = IJ[1]
+		# print('I = {}'.format(I))
+		X = np.squeeze(np.asarray(X[I]))
+		XI = np.squeeze(np.asarray(XI[I]))
+		# print('X = {}'.format(X))
+		# print('XI = {}'.format(XI))
+		Y = np.squeeze(np.asarray(Y[I]))
+		# print('J = {}'.format(J))
+		labels = [allelic_ladder[j][2] for j in J]
+		plot_label = [(x,y,l) for x,y,l in zip(X,Y,labels)]
 		case.plot_labels[ch] = plot_label
-		# print('\tch = {}, ch_allelic = {}'.format(ch, ch_allelic))
-		# print(allelic_case.plot_labels[ch_allelic])
 
 	return case
 
@@ -168,7 +199,8 @@ def main():
 	for case in cases.values():
 		print('working on {}'.format(case.name))
 		case = gather_PTE_case_data(case, path)
-		case = clo.baseline_correction(case, ch_ss_num=5, distance=5, iterations=5)
+		case = clo.baseline_correction_simple(case, ch_ss_num=5)
+		case = clo.baseline_correction_advanced(case, ch_ss_num=5)
 		case = clo.size_standard(case, ch_ss_num=5)
 		case = clo.local_southern(case)
 		case, allelic_case_names = build_allelic_ladder(case, allelic_case_names, ch_ss_num=5)
