@@ -41,6 +41,21 @@ def organize_PTE_files(path):
 		c.name = case_name
 	return cases
 
+def highlight_roi_PTE(case, ch, p):
+	ch_num = re.findall(r'channel_\d$', ch)[0]
+	legends = []
+	for allele_name, allele in alleles[ch_num].items():
+		x_left = allele['range'][0]
+		x_right = allele['range'][1]
+		roi_color = allele['color']
+		dummy_dot = p.line([0,0],[1,1], line_width=20, color=roi_color, alpha=0.10)
+		roi = BoxAnnotation(left=x_left, right=x_right, fill_color=roi_color, fill_alpha=0.05)
+		p.add_layout(roi)
+		legends.append(LegendItem(label=allele_name, renderers=[dummy_dot]))
+	p.add_layout(Legend(items=legends, location='top_right'))
+		# print(p.legend.items)
+	return p
+
 def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 	ch_ss = 'channel_' + str(ch_ss_num)
 	# ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch not in plot_dict.keys()]
@@ -70,6 +85,7 @@ def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 				text_font_size='10pt'
 			)
 			p.add_layout(labels)
+			p = highlight_roi_PTE(case, ch, p)
 			# for x,y,label in case.plot_labels.get(ch,[]):
 			# 	# print(x,y,label)
 			# 	# print('x = {}'.format(x))
@@ -172,7 +188,7 @@ def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 		# print('A = {}'.format(A))
 		R = np.absolute(X-A)
 		# print('R = {}'.format(R))
-		IJ = np.nonzero(R<1.0)
+		IJ = np.nonzero(R<1.2)
 		I = IJ[0]
 		J = IJ[1]
 		# print('I = {}'.format(I))
@@ -184,6 +200,13 @@ def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 		# print('J = {}'.format(J))
 		labels = [allelic_ladder[j][2] for j in J]
 		plot_label = [(x,y,l) for x,y,l in zip(X,Y,labels)]
+		plot_label_temp = {}
+		for x,y,l in plot_label:
+			t = plot_label_temp.get(x,[])
+			t.append(l)
+			plot_label_temp[x] = t
+		plot_label = [(x,y,plot_label_temp[x]) for x,y in zip(X,Y)]
+
 		case.plot_labels[ch] = plot_label
 
 	return case
@@ -243,7 +266,8 @@ alleles = {
 			'allelic labels': (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19),
 			'stock ladder': (122.49, 126.56, 130.66, 134.8, 138.98, 143.58, 148.03, 152.43, 156.73, 160.93, 165.03, 169.1),
 			'dye label': '6-FAM',
-			'control DNA 9947A':(13,13)
+			'control DNA 9947A':(13,13),
+			'color':'blue'
 		},
 		'D21S11': {
 			'range':(175,245),
@@ -252,6 +276,7 @@ alleles = {
 			'stock ladder': (184.41, 186.39, 188.35, 192.27, 196.21, 200.06, 202.03, 204.02, 206.08, 208.06, 210.03, 212.04, 214.03, 216.04, 218.03, 220.05, 221.98, 224.12, 226.03, 228.1, 230.03, 232.02, 236.08, 240.04),
 			'dye label': '6-FAM',
 			'control DNA 9947A':(30,30),
+			'color':'green'
 		},
 		'D7S820': {
 			'range':(245,297),
@@ -260,6 +285,7 @@ alleles = {
 			'stock ladder': (255.08, 259.13, 263.16, 267.19, 271.25, 275.28, 279.34, 283.38, 287.44, 291.51),
 			'dye label': '6-FAM',
 			'control DNA 9947A':(10,11),
+			'color':'red'
 		},
 		'CSF1PO': {
 			'range':(297,360),
@@ -268,6 +294,7 @@ alleles = {
 			'stock ladder': (303.99, 308.04, 312.1, 316.13, 320.18, 324.24, 328.3, 332.36, 336.39, 340.42),
 			'dye label': '6-FAM',
 			'control DNA 9947A':(10,12),
+			'color':'purple'
 		},
 	},
 	'channel_2': {
@@ -278,6 +305,7 @@ alleles = {
 			'stock ladder': (111.12, 115.23, 119.2, 123.14, 127.32, 131.54, 135.64, 139.72),
 			'dye label': 'VIC',
 			'control DNA 9947A':(14,15),
+			'color':'blue'
 		},
 		'TH01': {
 			'range':(155,210),
@@ -286,6 +314,7 @@ alleles = {
 			'stock ladder': (162.72, 166.78, 170.82, 174.83, 178.84, 182.82, 185.84, 186.77, 190.71, 201.48),
 			'dye label': 'VIC',
 			'control DNA 9947A':(8,9.3),
+			'color':'green'
 		},
 		'D13S317': {
 			'range':(210,260),
@@ -294,6 +323,7 @@ alleles = {
 			'stock ladder': (216.36, 220.34, 224.32, 228.31, 282.42, 236.3, 240.24, 244.23),
 			'dye label': 'VIC',
 			'control DNA 9947A':(11,11),
+			'color':'red'
 		},
 		'D16S539': {
 			'range':(240,300),
@@ -302,6 +332,7 @@ alleles = {
 			'stock ladder': (252.01, 264, 268, 272, 276.02, 280.03, 284.05, 288.08, 292.12),
 			'dye label': 'VIC',
 			'control DNA 9947A':(11,12),
+			'color':'purple'
 		},
 		'D2S1338': {
 			'range':(300,375),
@@ -310,6 +341,7 @@ alleles = {
 			'stock ladder': (306.27, 310.35, 314.39, 318.45, 322.52, 326.58, 330.66, 334.71, 338.74, 342.75, 346.78, 350.77, 354.69, 358.87),
 			'dye label': 'VIC',
 			'control DNA 9947A':(19,23),
+			'color':'yellow'
 		},
 	},
 	'channel_3': {
@@ -320,6 +352,7 @@ alleles = {
 			'stock ladder': (101.25, 105.16, 109.09, 113.04, 115.06, 117.02, 119.03, 121.02, 123.05, 125.03, 127.08, 129.08, 131.13, 133.16, 135.23),
 			'dye label': 'NED',
 			'control DNA 9947A':(14,15),
+			'color':'blue'
 		},
 		'vWA': {
 			'range':(145,215),
@@ -328,6 +361,7 @@ alleles = {
 			'stock ladder': (154.07, 158.26, 162.42, 166.66, 170.59, 174.62, 178.61, 182.54, 186.5, 190.43, 194.29, 198.17, 202.01, 206.36),
 			'dye label': 'NED',
 			'control DNA 9947A':(17,18),
+			'color':'green'
 		},
 		'TPOX': {
 			'range':(215,265),
@@ -336,6 +370,7 @@ alleles = {
 			'stock ladder': (221.82, 225.8, 229.79, 233.77, 237.76, 241.75, 245.78, 249.76),
 			'dye label': 'NED',
 			'control DNA 9947A':(8,8),
+			'color':'red'
 		},
 		'D18S51': {
 			'range':(255,375),
@@ -344,6 +379,7 @@ alleles = {
 			'stock ladder': (261.8, 269.94, 274.02, 276.03, 278.11, 282.2, 286.29, 288.29, 290.38, 292.39, 294.48, 298.57, 302.69, 306.83, 310.96, 315.08, 319.2, 323.39, 327.46, 331.59, 335.69, 339.8, 343.87),
 			'dye label': 'NED',
 			'control DNA 9947A':(15,19),
+			'color':'purple'
 		},
 	},
 	'channel_4': {
@@ -354,6 +390,7 @@ alleles = {
 			'stock ladder': (106.03 , 111.69),
 			'dye label': 'PET',
 			'control DNA 9947A':('X'),
+			'color':'blue'
 		},
 		'D5S818': {
 			'range':(120,180),
@@ -362,6 +399,7 @@ alleles = {
 			'stock ladder': (133.69, 137.8, 142.17, 146.64, 151.05, 155.32, 159.55, 163.63, 167.68, 171.7),
 			'dye label': 'PET',
 			'control DNA 9947A':(11,11),
+			'color':'green'
 		},
 		'FGA_low': {
 			'range':(200,290),
@@ -370,6 +408,7 @@ alleles = {
 			'stock ladder': (214.11, 218.14, 222.17, 226.21, 230.26, 234.29, 238.33, 242.37, 246.42, 250.48, 252.49, 254.5, 258.55, 262.63, 266.72, 268.53, 272.62, 276.71, 280.77),
 			'dye label': 'PET',
 			'control DNA 9947A':(23,24),
+			'color':'red'
 		},
 		'FGA_high': {
 			'range':(310,375),
@@ -378,6 +417,7 @@ alleles = {
 			'stock ladder': (317.89, 322.01, 326.14, 330.28, 334.28, 338.37, 342.51, 350.59, 354.54),
 			'dye label': 'PET',
 			'control DNA 9947A':(23,24),
+			'color':'purple'
 		},
 	}
 }

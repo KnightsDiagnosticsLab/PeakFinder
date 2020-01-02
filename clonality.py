@@ -55,7 +55,7 @@ channels_of_interest = {
 			'SCL_channel_1_repeat':'black'
 }
 
-regions_of_interest = {
+roi_clonality = {
 			'IGH-A_channel_1':[(310,360,'FR1-JH','blue')],
 			'IGH-B_channel_1':[(250,295,'FR2-JH','blue')],
 			'IGH-C_channel_2':[(100,170,'FR3-JH','blue')],
@@ -350,10 +350,10 @@ def baseline_correction_advanced(case, ch_list=None, ch_ss_num=4, iterations=3, 
 def index_of_peaks_to_annotate(case):
 	for ch in case.df.columns:
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_4', ch)
-		if ch in regions_of_interest.keys():
+		if ch in roi_clonality.keys():
 			peaks_x, _ = find_peaks(case.df[ch], prominence=100, height=300)
 			peaks_in_all_roi = []
-			for x_start, x_end, _, _ in regions_of_interest[ch]:
+			for x_start, x_end, _, _ in roi_clonality[ch]:
 				peaks_in_current_roi = [x for x in peaks_x if case.df[x_col_name][x] >= x_start and case.df[x_col_name][x] <= x_end]
 				peaks_y = case.df[ch][peaks_in_current_roi].to_list()
 				peaks_in_current_roi = [x for y,x in sorted(zip(peaks_y, peaks_in_current_roi), reverse=True)]
@@ -402,11 +402,11 @@ def plot_channels_of_interest(case, ch, plot_dict, w, h, ch_ss_num=4):
 		plot_dict[ch] = p
 	return plot_dict
 
-def highlight_regions_of_interest(case, ch, plot_dict, w, h):
-	if ch in regions_of_interest.keys():
+def highlight_roi_clonality(case, ch, plot_dict, w, h):
+	if ch in roi_clonality.keys():
 		p = plot_dict[ch]
 		legends = []
-		for x_left, x_right, roi_name, roi_color in regions_of_interest[ch]:
+		for x_left, x_right, roi_name, roi_color in roi_clonality[ch]:
 			dummy_dot = p.line([0,0],[1,1], line_width=20, color=roi_color, alpha=0.10)
 			roi = BoxAnnotation(left=x_left, right=x_right, fill_color=roi_color, fill_alpha=0.05)
 			p.add_layout(roi)
@@ -417,7 +417,7 @@ def highlight_regions_of_interest(case, ch, plot_dict, w, h):
 	return plot_dict
 
 def plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only, ch_ss_num=4):
-	if ch in regions_of_interest.keys():
+	if ch in roi_clonality.keys():
 		x_col_name = 'x_fitted_' + re.sub(r'channel_\d','channel_'+str(ch_ss_num), ch)
 		p = plot_dict[ch]
 		if replicate_only:
@@ -504,7 +504,7 @@ def plot_clonality_case(case, replicate_only, w=1100, h=350):
 	for ch in sorted(case.df.columns):
 		plot_dict = plot_scl(case, ch, plot_dict, w, h)
 		plot_dict = plot_channels_of_interest(case, ch, plot_dict, w, h)
-		plot_dict = highlight_regions_of_interest(case, ch, plot_dict, w, h)
+		plot_dict = highlight_roi_clonality(case, ch, plot_dict, w, h)
 		plot_dict = plot_empty_channel_3(case, ch, plot_dict, w, h)
 		plot_dict = plot_size_standard(case, ch, plot_dict, w, h)
 		plot_dict = plot_peaks_of_interest(case, ch, plot_dict, w, h, replicate_only)
