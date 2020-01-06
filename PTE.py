@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks, peak_prominences, peak_widths
 from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.integrate import simps
 from itertools import combinations
 from outliers import smirnov_grubbs as grubbs
 
@@ -17,6 +18,7 @@ from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool, PanTool, LegendItem, Legend, LabelSet
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 from bokeh.core.validation import silence
+from bokeh.models.markers import Diamond
 
 import clonality as clo
 
@@ -56,7 +58,7 @@ def highlight_roi_PTE(case, ch, p):
 		# print(p.legend.items)
 	return p
 
-def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
+def plot_PTE_case_old(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 	ch_ss = 'channel_' + str(ch_ss_num)
 	# ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch not in plot_dict.keys()]
 	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch]
@@ -70,8 +72,6 @@ def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 			x = case.df[x_col_name].to_list()
 			y = case.df[ch].to_list()
 			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
-			# print('ch = {}'.format(ch))
-			# print('case.plot_labels.get(ch,[]) = {}'.format(case.plot_labels.get(ch,[])))
 			source = pd.DataFrame.from_records(case.plot_labels.get(ch,[]), columns=['x','y','label'])
 			labels = LabelSet(
 				angle=1,
@@ -86,19 +86,58 @@ def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 			)
 			p.add_layout(labels)
 			p = highlight_roi_PTE(case, ch, p)
-			# for x,y,label in case.plot_labels.get(ch,[]):
-			# 	# print(x,y,label)
-			# 	# print('x = {}'.format(x))
-			# 	p.x(x, y)
-			# 	mytext = Label(angle=1, x=x, y=int(y), text=str(label), x_offset=0, y_offset=2, text_font_size='8pt')
-			# 	p.add_layout(mytext)
+		else:
+			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ch_ss_num=5)
+	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
+	# print(type(plot_dict.values()))
+	return plot_dict
 
+def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
+	ch_ss = 'channel_' + str(ch_ss_num)
+	# ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch not in plot_dict.keys()]
+	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch]
+	for ch in ch_list:
+		ch_num = re.findall(r'channel_\d$', ch)[0]
+		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ch_ss, ch)
+		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
+		p.toolbar.logo = None
+		if ch_ss not in ch:
+			p.x_range = Range1d(75,400)
+			x = case.df[x_col_name].to_list()
+			y = case.df[ch].to_list()
+			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
+			# print(case.plot_labels.get(ch,[]))
+			# print(ch)
+			source = pd.DataFrame.from_records(case.plot_labels.get(ch,[]), columns=['x','y','label','left_bases','right_bases'])
+			labels = LabelSet(
+				angle=1,
+				x='x',
+				y='y',
+				text='label',
+				x_offset=0,
+				y_offset=2,
+				source=ColumnDataSource(source),
+				render_mode='canvas',
+				text_font_size='10pt'
+			)
+			p.add_layout(labels)
+			p = highlight_roi_PTE(case, ch, p)
+			p.x(x='x',y='y', source=source)
+			# if 'Allelic' not in ch:
+			# 	for y, x1, x2 in case.widths[ch]:
+			# 		p.line([case.df[x_col_name][x1],y],[case.df[x_col_name][x2],y])
+			plot_dict[ch] = p
+
+			# p.x(x='left_bases',y=0, source=source, color='red')
+			# p.diamond(x='right_bases',y=0, source=source, color='green')
 			plot_dict[ch] = p
 		else:
 			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ch_ss_num=5)
 	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
 	# print(type(plot_dict.values()))
 	return plot_dict
+
+
 
 def find_peaks_in_range(case, ch, x_col_name, start, end, h=100, d=10):
 	peaks, _ = find_peaks(case.df[ch], height=h, distance=d)
@@ -154,14 +193,14 @@ def build_allelic_ladder(case, allelic_case_names, ch_ss_num=5):
 				# 	p.add_layout(mytext)
 				plot_labels = case.plot_labels.get(ch,[])
 				# print('plot_labels = {}'.format(len(plot_labels)))
-				plot_labels.extend([(x,y,label) for x,y,label in zip(x_peaks,y_peaks,allelic_labels)])
+				plot_labels.extend([(x,y,label,None,None) for x,y,label in zip(x_peaks,y_peaks,allelic_labels)])
 				# print('plot_labels_new = {}'.format(len(plot_labels)))
 				case.plot_labels[ch] = plot_labels
 		# plots = column(plot_list)
 		# show(plots)
 	return case, allelic_case_names
 
-def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
+def label_alleles(case, allelic_case, w=900, h=400, ch_ss_num=5):
 	# print(case.name)
 	pte_run = re.findall(r'PTE-\d+-\d+', case.name)[0]
 	ch_ss = 'channel_' + str(ch_ss_num)
@@ -184,7 +223,7 @@ def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 		XI = np.matrix(peaks_i).T
 		Y = np.matrix(peaks_y).T
 		# print('X = {}'.format(X))
-		A = np.matrix([a for a,_,_ in allelic_ladder])
+		A = np.matrix([a for a,*_ in allelic_ladder])
 		# print('A = {}'.format(A))
 		R = np.absolute(X-A)
 		# print('R = {}'.format(R))
@@ -199,15 +238,46 @@ def label_allelic_ladder(case, allelic_case, w=900, h=400, ch_ss_num=5):
 		Y = np.squeeze(np.asarray(Y[I]))
 		# print('J = {}'.format(J))
 		labels = [allelic_ladder[j][2] for j in J]
-		plot_label = [(x,y,l) for x,y,l in zip(X,Y,labels)]
+		left_bases = left_bases[I]
+		right_bases = right_bases[I]
+		# compute area of each peak
+		# labels = []
+		# print(left_bases)
+		# for lb, rb, l in zip(left_bases, right_bases, labels_temp):
+		# 	x = case.df[x_col_name][lb:rb].to_list()
+		# 	# print('x = {}'.format(x))
+		# 	y = case.df[ch][lb:rb].to_list()
+		# 	# print('y = {}'.format(y))
+		# 	area = simps(y=y,x=x)
+		# 	# print('area = {}'.format(area))
+		# 	labels.append([l,int(area)])
+		"""	Too many left & right bases. Need to use the matrix mask to reduce bases.
+		"""
+		plot_label = [(x,y,l,lb,rb) for x,y,l,lb,rb in zip(X,Y,labels,left_bases,right_bases)]
 		plot_label_temp = {}
-		for x,y,l in plot_label:
+		for x,y,l,lb,rb in plot_label:
 			t = plot_label_temp.get(x,[])
 			t.append(l)
 			plot_label_temp[x] = t
-		plot_label = [(x,y,plot_label_temp[x]) for x,y in zip(X,Y)]
+
+		""" second attempt using peak_widths
+		"""
+		# widths = peak_widths(x=case.df[ch],peaks=XI)
+		# print(widths)
+		# hlines = [(y,x1,x2) for y,x1,x2 in zip(widths[1], widths[2], widths[3])]
+		# case.widths[ch] = hlines
+		# results_full = peak_widths(case.df[ch], peaks, rel_height=1)
+		# print('widths = {}'.format(widths))
+		# print('ch = {}'.format(ch))
+		# print('len(I) = {}'.format(len(I)))
+		# print('len(widths) = {}'.format(len(widths)))
+		# for w in widths:
+		# 	pass
+		
+		plot_label = [(x,y,plot_label_temp[x],case.df[x_col_name][lb],case.df[x_col_name][rb]) for x,y,lb,rb in zip(X,Y,left_bases,right_bases)]
 
 		case.plot_labels[ch] = plot_label
+
 
 	return case
 
@@ -232,7 +302,7 @@ def main():
 	non_allelic_case_names = [case_name for case_name,case in cases.items() if 'Allelic' not in case_name]
 	for case_name in non_allelic_case_names:
 		case = cases[case_name]
-		case = label_allelic_ladder(case, allelic_case, ch_ss_num=5)
+		case = label_alleles(case, allelic_case, ch_ss_num=5)
 
 	for case in cases.values():
 		plot_dict = plot_PTE_case(case, plot_dict, w=1050, h=500)

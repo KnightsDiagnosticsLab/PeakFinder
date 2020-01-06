@@ -148,6 +148,7 @@ class Case(object):
 		self.index_of_replicate_peaks = {}
 		self.allelic_ladder = None
 		self.plot_labels = {}
+		self.widths = {}
 	pass
 
 def gather_case_data(case, case_name, path):
