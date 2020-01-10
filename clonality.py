@@ -149,6 +149,9 @@ class Case(object):
 		self.allelic_ladder = None
 		self.plot_labels = {}
 		self.widths = {}
+		self.abberant_peaks = {}
+		self.some_peaks = {}
+		self.some_upside_down_peaks = {}
 	pass
 
 def gather_case_data(case, case_name, path):
@@ -317,17 +320,41 @@ def baseline_correction_simple(case, ch_list=None, ch_ss_num=4):
 	for ch in ch_list:
 		peaks_i, props = find_peaks(case.df[ch], prominence=50)
 		I = case.df.index.to_list()
-		right_bases = props['right_bases']
-		left_bases = props['left_bases']
-		I_exclude = set()
-		for l,r in zip(left_bases, right_bases):
-			I_exclude.update(set(range(l,r)))
-		I = [i for i in I if i not in I_exclude]
-		x_baseline = case.df[ch][I].to_list()
+		I_1k = I[1000:]
+		# right_bases = props['right_bases']
+		# left_bases = props['left_bases']
+		# I_exclude = set()
+		# for l,r in zip(left_bases, right_bases):
+		# 	I_exclude.update(set(range(l,r)))
+		# I = [i for i in I if i not in I_exclude]
+		x_baseline = case.df[ch][I_1k].to_list()
 		# x_avg = mean(x_baseline)
-		polyxy = np.poly1d(np.polyfit(I, x_baseline, deg=1))
+		polyxy = np.poly1d(np.polyfit(I_1k, x_baseline, deg=1))
 		case.df[ch] = case.df[ch] - polyxy(case.df.index.to_list())
-	case.df = case.df.where(case.df > 0, 0)
+	# case.df = case.df.where(case.df > 0, 0)
+	return case
+
+def baseline_correction_upside_down(case, ch_list=None, ch_ss_num=4, iterations=3, prominence=1, distance=20):
+	if ch_list is None:
+		ch_list = case.df.columns.to_list()
+	else:
+		ch_list = list(set(case.df.columns.to_list()) & set(ch_list))
+	ch_ss = 'channel_' + str(ch_ss_num)
+	ch_list = [ch for ch in ch_list if ch_ss not in ch]
+	for ch in ch_list:
+		peaks_start, _ = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+		df = case.df[ch] * -1
+		peaks_start, _ = find_peaks(df, prominence=prominence, distance=distance)
+		all_your_base = set()
+		for i in range(0,iterations):
+			bases, props = find_peaks(df, prominence=prominence, distance=distance)
+			spl = InterpolatedUnivariateSpline(bases, df[bases], bbox=[bases[0], bases[int(len(bases)/2)]])
+			spl_df = pd.Series(spl(case.df.index.tolist()))
+			df = df - spl_df
+		case.df[ch] = df * -1
+		peaks_finish, _ = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+		abberant_peaks = set(peaks_finish) - set(peaks_start)
+		case.abberant_peaks[ch] = abberant_peaks
 	return case
 
 def baseline_correction_advanced(case, ch_list=None, ch_ss_num=4, iterations=3, prominence=1, distance=20):
@@ -338,14 +365,27 @@ def baseline_correction_advanced(case, ch_list=None, ch_ss_num=4, iterations=3, 
 	ch_ss = 'channel_' + str(ch_ss_num)
 	ch_list = [ch for ch in ch_list if ch_ss not in ch]
 	for ch in ch_list:
+		peaks_start, _ = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+		all_your_base = set()
 		for i in range(0,iterations):
-			_, props = find_peaks(case.df[ch], prominence=prominence, distance=distance)
-			bases = sorted(list(set(np.concatenate([props['left_bases'], props['right_bases']]))))
+			peaks_current, props = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+			# abberant_peaks = set(peaks_current) - set(peaks_original)
+			bases = set(np.concatenate([props['left_bases'], props['right_bases']]))
+			all_your_base = all_your_base | bases
+			# bases = bases | abberant_peaks
+			bases = sorted(list(bases))
+			# bases = sorted(list(set(np.concatenate([props['left_bases'], props['right_bases']]))))
 			# bases = [b for b in bases if b >=0]
-			spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
+			# spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases])
+			# print('len(bases) = {}'.format(len(bases)))
+			spl = InterpolatedUnivariateSpline(bases, case.df[ch][bases], ext=1)
 			# spl = interp1d(bases, case.df[ch][bases], fill_value='extrapolate')
 			spl_df = pd.Series(spl(case.df.index.tolist()))
 			case.df[ch] = case.df[ch] - spl_df
+		# peaks_finish, _ = find_peaks(case.df[ch], prominence=prominence, distance=distance)
+		# abberant_peaks = set(peaks_finish) - set(peaks_start)
+		# case.abberant_peaks[ch] = abberant_peaks
+		# case.abberant_peaks[ch] = all_your_base
 	return case
 
 def index_of_peaks_to_annotate(case):

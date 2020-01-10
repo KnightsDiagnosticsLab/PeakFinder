@@ -58,40 +58,6 @@ def highlight_roi_PTE(case, ch, p):
 		# print(p.legend.items)
 	return p
 
-def plot_PTE_case_old(case, plot_dict, w=1050, h=200, ch_ss_num=5):
-	ch_ss = 'channel_' + str(ch_ss_num)
-	# ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch not in plot_dict.keys()]
-	ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch]
-	for ch in ch_list:
-		ch_num = re.findall(r'channel_\d$', ch)[0]
-		x_col_name = 'x_fitted_' + re.sub(r'channel_\d',ch_ss, ch)
-		p = figure(tools='pan,wheel_zoom,reset',title=ch, width=w, height=h, x_axis_label='fragment size', y_axis_label='RFU', tooltips=TOOLTIPS)
-		p.toolbar.logo = None
-		if ch_ss not in ch:
-			p.x_range = Range1d(75,400)
-			x = case.df[x_col_name].to_list()
-			y = case.df[ch].to_list()
-			p.line(x, y, line_width=0.5, color=clo.channel_colors.get(ch_num, 'blue'))
-			source = pd.DataFrame.from_records(case.plot_labels.get(ch,[]), columns=['x','y','label'])
-			labels = LabelSet(
-				angle=1,
-				x='x',
-				y='y',
-				text='label',
-				x_offset=0,
-				y_offset=2,
-				source=ColumnDataSource(source),
-				render_mode='canvas',
-				text_font_size='10pt'
-			)
-			p.add_layout(labels)
-			p = highlight_roi_PTE(case, ch, p)
-		else:
-			plot_dict = clo.plot_size_standard(case, ch, plot_dict, w, h=400, ch_ss_num=5)
-	# print('len(plot_dict.values()) = {}'.format(len(plot_dict.values())))
-	# print(type(plot_dict.values()))
-	return plot_dict
-
 def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 	ch_ss = 'channel_' + str(ch_ss_num)
 	# ch_list = [ch for ch in case.df.columns if 'x_fitted' not in ch and ch not in plot_dict.keys()]
@@ -123,6 +89,8 @@ def plot_PTE_case(case, plot_dict, w=1050, h=200, ch_ss_num=5):
 			p.add_layout(labels)
 			p = highlight_roi_PTE(case, ch, p)
 			p.x(x='x',y='y', source=source)
+			for i in case.abberant_peaks.get(ch,[]):
+				p.circle(x=case.df[x_col_name][i], y=case.df[ch][i], color='red', size=10, alpha=0.25)
 			# if 'Allelic' not in ch:
 			# 	for y, x1, x2 in case.widths[ch]:
 			# 		p.line([case.df[x_col_name][x1],y],[case.df[x_col_name][x2],y])
@@ -292,8 +260,10 @@ def main():
 	for case in cases.values():
 		print('working on {}'.format(case.name))
 		case = gather_PTE_case_data(case, path)
-		case = clo.baseline_correction_simple(case, ch_ss_num=5)
-		case = clo.baseline_correction_advanced(case, ch_ss_num=5)
+		# case = clo.baseline_correction_simple(case, ch_ss_num=5)
+		case = clo.baseline_correction_advanced(case, ch_ss_num=5, prominence=10)
+		# case = clo.baseline_correction_simple(case, ch_ss_num=5)
+		# case = clo.baseline_correction_upside_down(case, ch_ss_num=5, iterations=5)
 		case = clo.size_standard(case, ch_ss_num=5)
 		case = clo.local_southern(case)
 		case, allelic_case_names = build_allelic_ladder(case, allelic_case_names, ch_ss_num=5)
