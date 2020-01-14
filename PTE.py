@@ -22,6 +22,10 @@ from bokeh.models.markers import Diamond
 
 import clonality as clo
 
+import easygui
+
+
+
 TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 silence(FIXED_SIZING_MODE, True)
 
@@ -317,7 +321,9 @@ def label_alleles(case, allelic_case, w=900, h=400, ch_ss_num=5):
 
 def main():
     owd = os.getcwd()  # original working directory
-    path = os.path.abspath(sys.argv[1])
+
+    # path = os.path.abspath(sys.argv[1])
+    path = easygui.diropenbox()
     os.chdir(path)
     cases = organize_PTE_files(path)
     plot_dict = {}

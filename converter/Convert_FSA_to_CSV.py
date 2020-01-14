@@ -6,12 +6,13 @@ import pandas as pd
 import argparse
 import os
 import sys
-
+import easygui
 
 # Command-line argument parser.
 def create_parser():
 	parser = argparse.ArgumentParser(description="This program converts Thermo Fisher 3100 Genetic Analyzer FSA files to CSV.")
-	parser.add_argument("-i", dest="input", type=str, nargs=1 , help="Input FSA file.", required=True)
+	parser.add_argument("-d", dest="input", type=str, nargs=1 , help="Input FSA Directory.", required=True)
+	parser.add_argument("-co", dest="channels_only", action='store_true', default=False, help="Option returns only Channels in CSV.", required=False)
 	#parser.add_argument("-o", dest="output", type=str, nargs=1, help="output CSV file", required=True) 
 	args = parser.parse_args()
 	return args
@@ -21,13 +22,10 @@ def create_dataframe(record, keys):
 	Description: Returns a dataframe containing all the data values for FSA/ABI file for 3130 Sequencer.
 	url: https://projects.nfstc.org/workshops/resources/articles/ABIF_File_Format.pdf
 	'''
-	channels = []
-	cols = [record.name + '.fsa.channel_1', record.name + '.fsa.channel_2', record.name + '.fsa.channel_3', record.name + '.fsa.channel_4', 
-			'Voltage, measured (decaVolts)', 'Current, Measured (milliAmps)',
-			'Power, Measured (milliWatts)', 'Temperature, measured (degress C)']
-	for key in keys:
-		if 'DATA' in key:
-			channels.append(record.annotations['abif_raw'][key])
+	DATA_list = ['DATA1','DATA2','DATA3','DATA4','DATA105']
+	# cols = [record.name + '.fsa.channel_1', record.name + '.fsa.channel_2', record.name + '.fsa.channel_3', record.name + '.fsa.channel_4']
+	channels = [record.annotations['abif_raw'][key] for key in keys if key in DATA_list]
+	cols = [record.name + '.fsa.channel_' + str(i+1) for i in range(len(channels))]
 	df = pd.DataFrame(channels)
 	df = df.T
 	df.columns = cols
@@ -88,7 +86,7 @@ def metadata_dataframe(record, keys):
 	'MODL1': 'Model number',
 	'NAVG1': 'Pixels average per lane',
 	'NLNE1': 'Number of cappilaries',
-	'OfSc1': 'List of scans that are marked off scale in colleciton (Optional)',
+	'OfSc1': 'List of scans that are marked off scale in collection (Optional)',
 	'Ovrl1': 'One value for each dye. List of scan number indices for scans with colo data values > 32767. Values cannot be greater than 32000. (Optional)',
 	'OvrV1': 'One value for each dye. List of color data values for the locations liusted in the Ovrl tag. Number of OvrV tags must be equal to the number of Ovrl tags (Optional)',
 	'PDMF1': 'Mobility file 1',
@@ -133,7 +131,7 @@ def metadata_dataframe(record, keys):
 	metadata = []
 	for key, description in ABI_3130.items():
 		if 'DATA' not in key:
-			if key in  record.annotations['abif_raw'].keys():
+			if key in record.annotations['abif_raw'].keys():
 				metadata.append([str(key), str(description), record.annotations['abif_raw'][key]])
 
 	df = pd.DataFrame(metadata)
@@ -143,24 +141,66 @@ def metadata_dataframe(record, keys):
 	df.columns = cols
 	return df.reset_index()
 
+def find_3130_files(dir_path):
+	files = [os.path.join(root, file) for root, dirs, files in os.walk(dir_path) for file in files if file.endswith('.fsa')]
+	return files
+
+def convert_folder(dir_path=None, channels_only=True):
+	if dir_path == None:
+		dir_path = easygui.diropenbox()
+
+	abs_path_dir = os.path.abspath(dir_path)
+	files = find_3130_files(abs_path_dir)
+
+	print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
+
+	for input_file in files:
+		abs_input_file = os.path.abspath(input_file)
+		outfile = abs_input_file.replace('.fsa', '.csv')
+
+		record = SeqIO.read(abs_input_file, 'abi')
+		keys = record.annotations['abif_raw'].keys()
+
+		data = create_dataframe(record, keys)
+		metadata = metadata_dataframe(record, keys)
+
+		results = data
+
+		if not channels_only:
+			metadata = metadata_dataframe(record, keys)
+			results = pd.concat([data, metadata], axis=1)
+			del results['index']
+		results.to_csv(outfile, index=False, header=True)
+		# print('\t{} -> {}'.format(input_file, outfile))
+
 def main():
-
 	myargs = create_parser()
-	input_file = myargs.input[0]
-	#output_dir = myargs.output[0]
+	input_dir = myargs.input[0]
 
-	abs_input_file = os.path.abspath(input_file)
-	outfile = abs_input_file.split('.')[0] + '.csv'
+	abs_path_dir = os.path.abspath(input_dir)
+	files = find_3130_files(abs_path_dir)
 
-	record = SeqIO.read(abs_input_file, 'abi')
-	keys = record.annotations['abif_raw'].keys()
+	print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
 
-	data = create_dataframe(record, keys)
-	metadata = metadata_dataframe(record, keys)
+	for input_file in files:
+		abs_input_file = os.path.abspath(input_file)
+		outfile = abs_input_file.split('.')[0] + '.csv'
 
-	results = pd.concat([data, metadata], axis=1)
-	del results['index']
-	results.to_csv(outfile, index=False, header=True)
+		record = SeqIO.read(abs_input_file, 'abi')
+		keys = record.annotations['abif_raw'].keys()
+
+		data = create_dataframe(record, keys)
+		metadata = metadata_dataframe(record, keys)
+
+		results = pd.concat([data, metadata], axis=1)
+		del results['index']
+
+		if myargs.channels_only:
+			results = results.iloc[:,0:4]
+			results.to_csv(outfile, index=False, header=True)
+		else:
+			results.to_csv(outfile, index=False, header=True)
+
 
 if __name__ == '__main__':
 	main()
