@@ -158,20 +158,20 @@ def convert_folder(dir_path=None, channels_only=True):
 		abs_input_file = os.path.abspath(input_file)
 		outfile = abs_input_file.replace('.fsa', '.csv')
 
-		record = SeqIO.read(abs_input_file, 'abi')
-		keys = record.annotations['abif_raw'].keys()
+		if not os.path.isfile(outfile):
+			record = SeqIO.read(abs_input_file, 'abi')
+			keys = record.annotations['abif_raw'].keys()
 
-		data = create_dataframe(record, keys)
-		metadata = metadata_dataframe(record, keys)
-
-		results = data
-
-		if not channels_only:
+			data = create_dataframe(record, keys)
 			metadata = metadata_dataframe(record, keys)
-			results = pd.concat([data, metadata], axis=1)
-			del results['index']
-		results.to_csv(outfile, index=False, header=True)
-		# print('\t{} -> {}'.format(input_file, outfile))
+
+			results = data
+
+			if not channels_only:
+				metadata = metadata_dataframe(record, keys)
+				results = pd.concat([data, metadata], axis=1)
+				del results['index']
+			results.to_csv(outfile, index=False, header=True)
 
 def main():
 	myargs = create_parser()
