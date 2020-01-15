@@ -38,7 +38,6 @@ def gather_PTE_case_data(case, path):
     case.df = df
     return case
 
-
 def organize_PTE_files(path):
     # construct case list
     csv_list = [f for f in os.listdir(path) if f.endswith('.csv')]
