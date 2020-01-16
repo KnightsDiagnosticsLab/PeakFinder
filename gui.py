@@ -6,12 +6,8 @@ from tkinter import ttk
 import os
 
 def main():
-    # path = easygui.diropenbox()
-    # convert_folder(path)
-    # cases = pte.organize_PTE_files(path)
-    # for case in cases.values():
-    #     print('working on {}'.format(case.name))
-
+    ''' tkinter based gui. Has crappy support for interactive plots.
+    '''
     window = tk.Tk()
     window.title('PTE')
     tab_control = ttk.Notebook(window)
@@ -41,9 +37,6 @@ def main():
     donors_btn.grid(column=0, row=1, sticky=tk.NE)
 
     window.mainloop()
-
-
-
 
 if __name__ == '__main__':
     main()
