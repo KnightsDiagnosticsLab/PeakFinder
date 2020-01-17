@@ -145,19 +145,59 @@ def find_3130_files(dir_path):
 	files = [os.path.join(root, file) for root, dirs, files in os.walk(dir_path) for file in files if file.endswith('.fsa')]
 	return files
 
+def convert_file_content(file_content, channels_only=True):
+	record = SeqIO.read(file_content, 'abi')
+	keys = record.annotations['abif_raw'].keys()
+
+	data = create_dataframe(record, keys)
+	metadata = metadata_dataframe(record, keys)
+
+	results = data
+
+	if not channels_only:
+		metadata = metadata_dataframe(record, keys)
+		results = pd.concat([data, metadata], axis=1)
+		del results['index']
+	return results
+
+def convert_file(file_path=None, channels_only=True):
+	# print(file_path)
+	if file_path == None:
+		file_path = easygui.fileopenbox()
+
+	abs_input_file = os.path.abspath(file_path)
+	outfile = abs_input_file.replace('.fsa', '.csv')
+
+	if not os.path.isfile(outfile):
+		record = SeqIO.read(abs_input_file, 'abi')
+		keys = record.annotations['abif_raw'].keys()
+
+		data = create_dataframe(record, keys)
+		metadata = metadata_dataframe(record, keys)
+
+		results = data
+
+		if not channels_only:
+			metadata = metadata_dataframe(record, keys)
+			results = pd.concat([data, metadata], axis=1)
+			del results['index']
+		results.to_csv(outfile, index=False, header=True)
+	return outfile
+
 def convert_folder(dir_path=None, channels_only=True):
 	if dir_path == None:
 		dir_path = easygui.diropenbox()
 
 	abs_path_dir = os.path.abspath(dir_path)
 	files = find_3130_files(abs_path_dir)
+	outfiles = []
 
 	print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
 
 	for input_file in files:
 		abs_input_file = os.path.abspath(input_file)
 		outfile = abs_input_file.replace('.fsa', '.csv')
-
+		outfiles.append(outfile)
 		if not os.path.isfile(outfile):
 			record = SeqIO.read(abs_input_file, 'abi')
 			keys = record.annotations['abif_raw'].keys()
@@ -172,6 +212,7 @@ def convert_folder(dir_path=None, channels_only=True):
 				results = pd.concat([data, metadata], axis=1)
 				del results['index']
 			results.to_csv(outfile, index=False, header=True)
+	return outfiles
 
 def main():
 	myargs = create_parser()
