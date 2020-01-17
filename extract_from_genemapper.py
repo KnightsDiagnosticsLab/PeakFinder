@@ -10,30 +10,18 @@ from openpyxl.styles import Border, Side, PatternFill, Font, GradientFill, Align
 import string
 import win32com.client as win32
 import csv
+from fsa import use_csv_module
 
 pd.set_option('display.max_columns', 20)
 
-
-def use_csv_module(filename):
-    with open(filename, newline='') as csvfile:
-        dialect = csv.Sniffer().sniff(csvfile.read(1024))
-        csvfile.seek(0)
-        reader = csv.reader(csvfile, dialect)
-        l = [r for r in reader]
-    headers = l.pop(0)
-    df = pd.DataFrame(l, columns=headers)
-    df.replace(r'^\s*$', pd.np.nan, regex=True, inplace=True)
-    # print(df)
-    return df
-
-
-def build_results_dict():
+def build_results_dict(df=None):
     peaks = {}
-    filename = easygui.fileopenbox(
-        msg='Select results file (should end in .csv)')
-    if filename is None:
-        exit()
-    df = use_csv_module(filename)
+    if df==None:
+        filename = easygui.fileopenbox(
+            msg='Select results file (should end in .csv)')
+        if filename is None:
+            exit()
+        df = use_csv_module(filename)
     df = df[['Sample File Name', 'Marker', 'Allele', 'Area']]
     # get rid of peaks that aren't assigned an allele
     df.dropna(axis=0, how='any', inplace=True)
@@ -53,9 +41,9 @@ def build_results_dict():
     # assert len(keys) == len(set(keys))
     # for k,v in results.items():
     # 	print(k,v)
-    print(filename)
-    for x in fnames:
-        print('\t' + x)
+    # print(filename)
+    # for x in fnames:
+    #     print('\t' + x)
     return peaks
 
 

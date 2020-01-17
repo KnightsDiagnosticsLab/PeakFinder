@@ -6,7 +6,12 @@ import pandas as pd
 import argparse
 import os
 import sys
-import easygui
+# import easygui
+import tkinter as tk
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename, askdirectory
+
+
 
 # Command-line argument parser.
 def create_parser():
@@ -161,14 +166,21 @@ def convert_file_content(file_content, channels_only=True):
 	return results
 
 def convert_file(file_path=None, channels_only=True):
-	# print(file_path)
+	root = tk.Tk()
+	root.withdraw()		# hide the root tk window
+
 	if file_path == None:
-		file_path = easygui.fileopenbox()
+		file_path = askopenfilename(filetypes = (('Fragment Size Analysis', '*.fsa'),
+											('Comma Separated Values','*.csv'),
+										),
+								title = 'Choose an FSA file.'
+								)
+	root.destroy()		# kill the root tk window
 
 	abs_input_file = os.path.abspath(file_path)
-	outfile = abs_input_file.replace('.fsa', '.csv')
+	outfile_path = abs_input_file.replace('.fsa', '.csv')
 
-	if not os.path.isfile(outfile):
+	if not os.path.isfile(outfile_path):
 		record = SeqIO.read(abs_input_file, 'abi')
 		keys = record.annotations['abif_raw'].keys()
 
@@ -181,24 +193,33 @@ def convert_file(file_path=None, channels_only=True):
 			metadata = metadata_dataframe(record, keys)
 			results = pd.concat([data, metadata], axis=1)
 			del results['index']
-		results.to_csv(outfile, index=False, header=True)
-	return outfile
+		results.to_csv(outfile_path, index=False, header=True)
+	return outfile_path
 
 def convert_folder(dir_path=None, channels_only=True):
+	root = tk.Tk()
+	root.withdraw()		# hide the root tk window
+
 	if dir_path == None:
-		dir_path = easygui.diropenbox()
+		# dir_path = easygui.diropenbox()
+		dir_path = askdirectory(filetypes = (('Fragment Size Analysis', '*.fsa'),
+											('Comma Separated Values','*.csv'),
+										),
+								title = 'Choose folder of FSA files.'
+								)
+	root.destroy()		# kill the root tk window
 
 	abs_path_dir = os.path.abspath(dir_path)
 	files = find_3130_files(abs_path_dir)
-	outfiles = []
+	outfile_paths = []
 
 	print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
 
 	for input_file in files:
 		abs_input_file = os.path.abspath(input_file)
-		outfile = abs_input_file.replace('.fsa', '.csv')
-		outfiles.append(outfile)
-		if not os.path.isfile(outfile):
+		outfile_path = abs_input_file.replace('.fsa', '.csv')
+		outfile_paths.append(outfile_path)
+		if not os.path.isfile(outfile_path):
 			record = SeqIO.read(abs_input_file, 'abi')
 			keys = record.annotations['abif_raw'].keys()
 
@@ -211,8 +232,8 @@ def convert_folder(dir_path=None, channels_only=True):
 				metadata = metadata_dataframe(record, keys)
 				results = pd.concat([data, metadata], axis=1)
 				del results['index']
-			results.to_csv(outfile, index=False, header=True)
-	return outfiles
+			results.to_csv(outfile_path, index=False, header=True)
+	return outfile_paths
 
 def main():
 	myargs = create_parser()
@@ -225,7 +246,7 @@ def main():
 
 	for input_file in files:
 		abs_input_file = os.path.abspath(input_file)
-		outfile = abs_input_file.split('.')[0] + '.csv'
+		outfile_path = abs_input_file.split('.')[0] + '.csv'
 
 		record = SeqIO.read(abs_input_file, 'abi')
 		keys = record.annotations['abif_raw'].keys()
@@ -238,9 +259,9 @@ def main():
 
 		if myargs.channels_only:
 			results = results.iloc[:,0:4]
-			results.to_csv(outfile, index=False, header=True)
+			results.to_csv(outfile_path, index=False, header=True)
 		else:
-			results.to_csv(outfile, index=False, header=True)
+			results.to_csv(outfile_path, index=False, header=True)
 
 
 if __name__ == '__main__':
