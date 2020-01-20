@@ -118,12 +118,12 @@ columns = [TableColumn(field='Sample File Name', title='Sample File Name', width
 			]
 
 source = ColumnDataSource(data)
-data_table = DataTable(columns=columns, source=source)
+data_table = DataTable(columns=columns, source=source, selectable='checkbox')
 
 
 
 curdoc().add_root(column(results_row, host_row, donor_row, export_row, select_case))
-curdoc().add_root(row(column(data_table, sizing_mode='stretch_height'), column(p, sizing_mode='stretch_width')))
+curdoc().add_root(column(data_table, sizing_mode='stretch_height'))
 curdoc().title = 'PTE'
 
 
