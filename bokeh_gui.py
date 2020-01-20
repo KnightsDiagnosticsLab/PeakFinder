@@ -4,11 +4,13 @@ from bokeh.models.widgets import FileInput, DataTable, DateFormatter, TableColum
 from bokeh.models import TextInput, Button, ColumnDataSource
 from convert_fsa_to_csv import convert_file, convert_file_content
 from os.path import basename
-# import easygui
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askdirectory, asksaveasfilename
+
 import pandas as pd
+
 from fsa import use_csv_module
 
 df = pd.DataFrame()
@@ -36,7 +38,8 @@ donor_row = row(select_donor, donor_text)
 
 def reduce_rows(df):
 	cols = ['Sample File Name', 'Marker','Allele', 'Area']
-	data = df[cols].dropna(how='any')
+	# data = df[cols].dropna(how='any')
+	data = df.dropna(axis=0, how='any', subset=cols)
 	data.sort_values(by=cols, ascending=True, inplace=True)
 	return data
 
@@ -49,7 +52,9 @@ def select_case_callback(attrname, old, new):
 	# 			TableColumn(field='Allele', title='Allele', width=50),
 	# 			TableColumn(field='Area', title='Area', width=50),
 	# 			]
+	# print(df)
 	data_table.source.data = source.data
+	# p.vbar(source=source, x='Sample File Name', top='Area', width=1)
 
 select_case = Select(options=cases)
 select_case.on_change('value', select_case_callback)
@@ -79,7 +84,7 @@ def select_results_callback():
 		cases = sorted(list(set(df['Sample File Name'].to_list())))
 		select_case.options = cases
 		select_case.value = cases[0]
-
+	# print(df)
 	# data = df.loc[df['Sample File Name'] == select_case.value]
 	# source = ColumnDataSource(data)
 	# data_table.source.data = source.data
@@ -117,10 +122,8 @@ data_table = DataTable(columns=columns, source=source)
 
 
 
-
-
 curdoc().add_root(column(results_row, host_row, donor_row, export_row, select_case))
-curdoc().add_root(column(data_table, sizing_mode='stretch_height'))
+curdoc().add_root(row(column(data_table, sizing_mode='stretch_height'), column(p, sizing_mode='stretch_width')))
 curdoc().title = 'PTE'
 
 
