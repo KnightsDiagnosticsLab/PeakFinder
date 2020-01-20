@@ -18,21 +18,21 @@ data = pd.DataFrame(columns=['Sample File Name','Marker','Allele','Area'])
 results_files = []
 cases = []
 
-def select_host_callback():
+def on_host_change():
 	fpath = convert_file()
 	host_text.value = basename(fpath)
 
 select_host = Button(label='Select Host', button_type='success')
-select_host.on_click(select_host_callback)
+select_host.on_click(on_host_change)
 host_text = TextInput(value='<host file>', disabled=True)
 host_row = row(select_host, host_text)
 
-def select_donor_callback():
+def on_donor_change():
 	fpath = convert_file()
 	donor_text.value = basename(fpath)
 
 select_donor = Button(label='Select Donor', button_type='success')
-select_donor.on_click(select_donor_callback)
+select_donor.on_click(on_donor_change)
 donor_text = TextInput(value='<donor file>', disabled=True)
 donor_row = row(select_donor, donor_text)
 
@@ -43,7 +43,7 @@ def reduce_rows(df):
 	data.sort_values(by=cols, ascending=True, inplace=True)
 	return data
 
-def select_case_callback(attrname, old, new):
+def on_case_change(attrname, old, new):
 	global df
 	data = df.loc[df['Sample File Name'] == new]
 	source = ColumnDataSource(data)
@@ -57,11 +57,11 @@ def select_case_callback(attrname, old, new):
 	# p.vbar(source=source, x='Sample File Name', top='Area', width=1)
 
 select_case = Select(options=cases)
-select_case.on_change('value', select_case_callback)
+select_case.on_change('value', on_case_change)
 # data_table = DataTable(source=source, columns=columns)
 # curdoc().add_root()
 
-def select_results_callback():
+def on_results_change():
 	global cases, results_files, df
 
 	root = tk.Tk()
@@ -92,12 +92,12 @@ def select_results_callback():
 # select_results = FileInput(accept='.csv, .txt, .tsv')
 
 select_results = Button(label='Add GeneMapper Results', button_type='success')
-select_results.on_click(select_results_callback)
+select_results.on_click(on_results_change)
 results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
 results_row = row(select_results, results_text)
 
 
-def export_template_callback():
+def on_export_template_change():
 	root = tk.Tk()
 	root.withdraw()		# hide the root tk window
 	file_path = asksaveasfilename(defaultextension = '.xlsx',
@@ -107,11 +107,12 @@ def export_template_callback():
 	export_text.value = basename(file_path)
 
 export_template = Button(label='Export Template', button_type='success')
-export_template.on_click(export_template_callback)
+export_template.on_click(on_export_template_change)
 export_text = TextInput(value='<template file>', disabled=True)
 export_row = row(export_template, export_text)
 
-columns = [TableColumn(field='Sample File Name', title='Sample File Name', width=300),
+columns = [
+			# TableColumn(field='Sample File Name', title='Sample File Name', width=300),
 			TableColumn(field='Marker', title='Marker', width=75),
 			TableColumn(field='Allele', title='Allele', width=50),
 			TableColumn(field='Area', title='Area', width=50),
