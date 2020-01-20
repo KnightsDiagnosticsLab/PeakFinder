@@ -38,7 +38,6 @@ donor_row = row(select_donor, donor_text)
 
 def reduce_rows(df):
 	cols = ['Sample File Name', 'Marker','Allele', 'Area']
-	# data = df[cols].dropna(how='any')
 	data = df.dropna(axis=0, how='any', subset=cols)
 	data.sort_values(by=cols, ascending=True, inplace=True)
 	return data
@@ -47,19 +46,10 @@ def on_case_change(attrname, old, new):
 	global df
 	data = df.loc[df['Sample File Name'] == new]
 	source = ColumnDataSource(data)
-	# columns = [TableColumn(field='Sample File Name', title='Sample File Name', width=300),
-	# 			TableColumn(field='Marker', title='Marker', width=75),
-	# 			TableColumn(field='Allele', title='Allele', width=50),
-	# 			TableColumn(field='Area', title='Area', width=50),
-	# 			]
-	# print(df)
 	data_table.source.data = source.data
-	# p.vbar(source=source, x='Sample File Name', top='Area', width=1)
 
 select_case = Select(options=cases)
 select_case.on_change('value', on_case_change)
-# data_table = DataTable(source=source, columns=columns)
-# curdoc().add_root()
 
 def on_results_change():
 	global cases, results_files, df
@@ -84,12 +74,7 @@ def on_results_change():
 		cases = sorted(list(set(df['Sample File Name'].to_list())))
 		select_case.options = cases
 		select_case.value = cases[0]
-	# print(df)
-	# data = df.loc[df['Sample File Name'] == select_case.value]
-	# source = ColumnDataSource(data)
-	# data_table.source.data = source.data
 
-# select_results = FileInput(accept='.csv, .txt, .tsv')
 
 select_results = Button(label='Add GeneMapper Results', button_type='success')
 select_results.on_click(on_results_change)
@@ -129,16 +114,9 @@ curdoc().title = 'PTE'
 
 
 ''' Outline of functions
-	get_host_file
-		callback -> convert_fsa_to_csv
-					make_dataframe
-					apply_local_southern
-					reindex_dataframe
-					plot_graph
-	get_donor_file
-		callback ->	convert_fsa_to_csv
-					make_dataframe
-					apply_local_southern
-					reindex_dataframe
-					plot_graph
+	on_case_change
+		add logic of pre-selecting certain rows
+		color code rows by Marker -> harder than it should be!
+		show live export template
+
 '''
