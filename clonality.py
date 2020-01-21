@@ -18,6 +18,9 @@ from bokeh.models import BoxAnnotation, Label, Range1d, WheelZoomTool, ResetTool
 from bokeh.core.validation.warnings import FIXED_SIZING_MODE
 from bokeh.core.validation import silence
 
+import easygui
+from convert_fsa_to_csv import convert_folder
+
 TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 silence(FIXED_SIZING_MODE, True)
 
@@ -304,9 +307,14 @@ def build_ladder(df, size_standard, label_name):
 
 def reduce_choices(ds, label_name):
     t = 2.0
-    # print(ds)
-    peaks_x_restricted, _ = find_peaks(
-        ds, height=[20, 1000], distance=30, width=2)
+    print(ds)
+    try:
+        peaks_x_restricted, _ = find_peaks(
+            ds, height=[20, 1000], distance=30, width=2)
+    except:
+        p = figure(tools='pan,wheel_zoom,reset', tooltips=TOOLTIPS, title=label_name)
+        p.line(ds.index.to_list(), ds, line_width=0.5, color='blue')
+        show(p)
     peaks_x, _ = find_peaks(ds)
     coor = [(x, ds[x]) for x in peaks_x]
     # print('label_name = {}'.format(label_name))
@@ -785,8 +793,10 @@ def replicate_peaks(case):
 
 def main():
     owd = os.getcwd()  # original working directory
-    path = os.path.abspath(sys.argv[1])
+    # path = os.path.abspath(sys.argv[1])
+    path = easygui.diropenbox()
     os.chdir(path)
+    convert_folder(path)
     cases = organize_clonality_files(path)
     # output_path = os.path.join(path, '/plots')
     # if not os.path.exists(output_path): os.mkdir(output_path)
@@ -796,16 +806,17 @@ def main():
         case = gather_case_data(case, case_name, path)
         case = size_standard(case, ch_ss_num=4)
         case = find_artifactual_peaks(case)
-        # case = baseline_correction_simple(case)
-        case = baseline_correction_advanced(
-            case, ch_list=channels_of_interest.keys(), distance=10)
+        case = baseline_correction_simple(case)
+        # case = baseline_correction_advanced(
+        #     case, ch_list=channels_of_interest.keys(), distance=10)
         # case = pick_peak_one(case)
         # case = make_decay_curve(case)
         case = local_southern(case)
         case = index_of_peaks_to_annotate(case)
         case = replicate_peaks(case)
         plot_clonality_case(case, replicate_only=False, w=1050, h=350)
-
+        # except:
+        #     print('Failed on {}'.format(case))
 
 if __name__ == '__main__':
     main()
