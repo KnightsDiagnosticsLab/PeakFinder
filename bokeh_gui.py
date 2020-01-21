@@ -1,7 +1,7 @@
 from bokeh.io import curdoc
-from bokeh.layouts import column, row
-from bokeh.models.widgets import FileInput, DataTable, DateFormatter, TableColumn, RadioButtonGroup, RadioGroup, Select, TextAreaInput
-from bokeh.models import TextInput, Button, ColumnDataSource
+from bokeh.layouts import column, row, gridplot
+from bokeh.models.widgets import FileInput, DataTable, DateFormatter, TableColumn, RadioButtonGroup, RadioGroup, Select, TextAreaInput, MultiSelect
+from bokeh.models import TextInput, Button, ColumnDataSource, CDSView, IndexFilter, Panel, Tabs
 from convert_fsa_to_csv import convert_file, convert_file_content
 from os.path import basename
 
@@ -14,45 +14,42 @@ import pandas as pd
 from fsa import use_csv_module
 
 df = pd.DataFrame()
-data = pd.DataFrame(columns=['Sample File Name','Marker','Allele','Area'])
 results_files = []
 cases = []
+universal_selected = set()
 
-def on_host_change():
-	fpath = convert_file()
-	host_text.value = basename(fpath)
-
-select_host = Button(label='Select Host', button_type='success')
-select_host.on_click(on_host_change)
-host_text = TextInput(value='<host file>', disabled=True)
-host_row = row(select_host, host_text)
-
-def on_donor_change():
-	fpath = convert_file()
-	donor_text.value = basename(fpath)
-
-select_donor = Button(label='Select Donor', button_type='success')
-select_donor.on_click(on_donor_change)
-donor_text = TextInput(value='<donor file>', disabled=True)
-donor_row = row(select_donor, donor_text)
 
 def reduce_rows(df):
+	df.dropna(axis=1, how='all', inplace=True)
 	cols = ['Sample File Name', 'Marker','Allele', 'Area']
-	data = df.dropna(axis=0, how='any', subset=cols)
-	data.sort_values(by=cols, ascending=True, inplace=True)
-	return data
+	df.dropna(axis=0, how='any', subset=cols, inplace=True)
+	df.sort_values(by=cols, ascending=True, inplace=True)
+	return df
 
-def on_case_change(attrname, old, new):
-	global df
-	data = df.loc[df['Sample File Name'] == new]
-	source = ColumnDataSource(data)
-	data_table.source.data = source.data
 
-select_case = Select(options=cases)
-select_case.on_change('value', on_case_change)
+def on_donor_change(attrname, old, new):
+	global df, data_table, universal_selected
+	newest = [c for c in new if c not in old]
+	if len(newest) > 0:
+		indices = df.index[df['Sample File Name'] == newest[0]].tolist()
+		view = CDSView(source=source, filters=[IndexFilter(indices)])
+		data_table.view = view
+		data_table.source.selected.indices = sorted(list(universal_selected))
+
+
+def on_host_change(attrname, old, new):
+	global df, data_table
+	indices = df.index[df['Sample File Name'] == new].tolist()
+	view = CDSView(source=source, filters=[IndexFilter(indices)])
+	data_table.view = view
+	data_table.source.selected.indices = sorted(list(universal_selected))
+	# print('data_table.source.selected.indices = {}'.format(data_table.source.selected.indices))
+	# host_tab = Panel(child=data_table, title='Host')
+	# t.tabs = [host_tab]
+
 
 def on_results_change():
-	global cases, results_files, df
+	global cases, results_files, df, source, data_table
 
 	root = tk.Tk()
 	root.withdraw()		# hide the root tk window
@@ -68,18 +65,20 @@ def on_results_change():
 		results_text.value = '\n'.join(results_files)
 
 		df_new = use_csv_module(file_path)
-		df = pd.concat([df, df_new], axis=0, sort=True)
-		df = reduce_rows(df)
+		df_new.index.name = 'Index'
+		df_new = reduce_rows(df_new)
+		df = pd.concat([df, df_new], axis=0, sort=False, ignore_index=True)
+	
+		source = ColumnDataSource(df)
+		data_table.source.data = source.data		# This will probably reset the selected indices
 
 		cases = sorted(list(set(df['Sample File Name'].to_list())))
-		select_case.options = cases
-		select_case.value = cases[0]
-
-
-select_results = Button(label='Add GeneMapper Results', button_type='success')
-select_results.on_click(on_results_change)
-results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
-results_row = row(select_results, results_text)
+		# select_case.options = cases
+		select_host_case.options = cases
+		select_donor_case.options = cases
+		# select_case.value = cases[0]
+	if len(results_files) == 1:
+		select_host_case.value = cases[0]
 
 
 def on_export_template_change():
@@ -91,29 +90,62 @@ def on_export_template_change():
 	root.destroy()
 	export_text.value = basename(file_path)
 
+
+def on_selected_change(attrname, old, new):
+	global universal_selected
+	print('data_table.')
+	print('BEFORE universal_selected = {}'.format(universal_selected))
+	old_set = set(old)
+	old_set.discard(None)
+	print('old_set = {}'.format(old_set))
+	new_set = set(new)
+	new_set.discard(None)
+	print('new_set = {}'.format(new_set))
+	universal_selected = universal_selected - old_set
+	universal_selected = universal_selected | new_set
+	print('AFTER universal_selected = {}\n'.format(universal_selected))
+
+select_results = Button(label='Add GeneMapper Results', button_type='success')
+select_results.on_click(on_results_change)
+results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
+
+select_host_case = Select(title='Select Host', options=cases)
+select_host_case.on_change('value', on_host_change)
+
+select_donor_case = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>', options=cases, size=12)
+select_donor_case.on_change('value', on_donor_change)
+
 export_template = Button(label='Export Template', button_type='success')
 export_template.on_click(on_export_template_change)
 export_text = TextInput(value='<template file>', disabled=True)
-export_row = row(export_template, export_text)
 
 columns = [
-			# TableColumn(field='Sample File Name', title='Sample File Name', width=300),
+			TableColumn(field='Sample File Name', title='Sample File Name', width=300),
 			TableColumn(field='Marker', title='Marker', width=75),
 			TableColumn(field='Allele', title='Allele', width=50),
 			TableColumn(field='Area', title='Area', width=50),
 			]
 
-source = ColumnDataSource(data)
+source = ColumnDataSource()
+source.selected.on_change('indices', on_selected_change)
 data_table = DataTable(columns=columns, source=source, selectable='checkbox')
 
 
+grid = gridplot(
+				[[select_results, results_text],
+				[None, select_host_case],
+				[None, select_donor_case]],
+				merge_tools=True,
+				toolbar_options=dict(logo=None)
+			)
 
-curdoc().add_root(column(results_row, host_row, donor_row, export_row, select_case))
+curdoc().add_root(grid)
 curdoc().add_root(column(data_table, sizing_mode='stretch_height'))
 curdoc().title = 'PTE'
 
 
 ''' Outline of functions
+	Input box for Host's name
 	on_case_change
 		add logic of pre-selecting certain rows
 		color code rows by Marker -> harder than it should be!
