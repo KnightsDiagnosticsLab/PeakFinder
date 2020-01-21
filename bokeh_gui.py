@@ -13,9 +13,12 @@ import pandas as pd
 
 from fsa import use_csv_module
 
+import copy
+
 df = pd.DataFrame()
 results_files = []
-cases = []
+cases = {}
+tables = {}
 universal_selected = set()
 
 
@@ -28,28 +31,38 @@ def reduce_rows(df):
 
 
 def on_donor_change(attrname, old, new):
-	global df, data_table, universal_selected
+	global data_table, current_case
+	print(old, new)
+	print(data_table.source.selected.indices)
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
-		indices = df.index[df['Sample File Name'] == newest[0]].tolist()
-		view = CDSView(source=source, filters=[IndexFilter(indices)])
-		data_table.view = view
-		data_table.source.selected.indices = sorted(list(universal_selected))
+		current_case = newest[0]
+		# indices = df.index[df['Sample File Name'] == newest[0]].tolist()
+		# view = CDSView(source=source, filters=[IndexFilter(indices)])
+		# data_table.view = view
+		# data_table.source.selected.indices = sorted(list(universal_selected))
+		# data_table = tables[newest[0]]
+		data_table.source.data = cases[newest[0]].data
+		data_table.source.selected.indices = cases[newest[0]].selected.indices[:]
 
 
 def on_host_change(attrname, old, new):
-	global df, data_table
-	indices = df.index[df['Sample File Name'] == new].tolist()
-	view = CDSView(source=source, filters=[IndexFilter(indices)])
-	data_table.view = view
-	data_table.source.selected.indices = sorted(list(universal_selected))
-	# print('data_table.source.selected.indices = {}'.format(data_table.source.selected.indices))
-	# host_tab = Panel(child=data_table, title='Host')
-	# t.tabs = [host_tab]
+	print(new)
+	global cases, data_table, current_case
+	current_case = new
+	# indices = df.index[df['Sample File Name'] == new].tolist()
+	# view = CDSView(source=source, filters=[IndexFilter(indices)])
+	# data_table.view = view
+	# data_table.source.selected.indices = sorted(list(universal_selected))
+	data_table.source.data = cases[new].data
+	data_table.source.selected.indices = cases[new].selected.indices[:]
+	# curdoc().add_root(tables[new])
+
 
 
 def on_results_change():
-	global cases, results_files, df, source, data_table
+	global cases, results_files, df, source, data_table, results
+
 
 	root = tk.Tk()
 	root.withdraw()		# hide the root tk window
@@ -67,18 +80,30 @@ def on_results_change():
 		df_new = use_csv_module(file_path)
 		df_new.index.name = 'Index'
 		df_new = reduce_rows(df_new)
-		df = pd.concat([df, df_new], axis=0, sort=False, ignore_index=True)
+		# df = pd.concat([df, df_new], axis=0, sort=False, ignore_index=True)
 	
-		source = ColumnDataSource(df)
-		data_table.source.data = source.data		# This will probably reset the selected indices
+		# source = ColumnDataSource(df)
+		# data_table.source.data = source.data		# This will probably reset the selected indices
 
-		cases = sorted(list(set(df['Sample File Name'].to_list())))
-		# select_case.options = cases
-		select_host_case.options = cases
-		select_donor_case.options = cases
-		# select_case.value = cases[0]
+		case_names = sorted(list(set(df_new['Sample File Name'].to_list())))
+
+		for case in case_names:
+			df_copy = df_new.loc[df_new['Sample File Name'] == case]
+			source = ColumnDataSource(df_copy.copy(deep=True))
+			# source.selected.on_change('indices', on_selected_change)
+			cases[case] = source
+			cases[case].selected.on_change('indices', on_selected_change)
+			# table = DataTable(columns=columns, source=cases[case], selectable='checkbox')
+			# table.source.selected.on_change('indices', on_selected_change)
+			# tables[case] = DataTable(columns=columns, source=cases[case], selectable='checkbox')
+			# tables[case] = table
+
+
+		select_host_case.options = list(cases.keys())
+		select_donor_case.options = list(cases.keys())
+
 	if len(results_files) == 1:
-		select_host_case.value = cases[0]
+		select_host_case.value = list(cases.keys())[0]
 
 
 def on_export_template_change():
@@ -92,32 +117,38 @@ def on_export_template_change():
 
 
 def on_selected_change(attrname, old, new):
-	global universal_selected
-	print('data_table.')
-	print('BEFORE universal_selected = {}'.format(universal_selected))
-	old_set = set(old)
-	old_set.discard(None)
-	print('old_set = {}'.format(old_set))
-	new_set = set(new)
-	new_set.discard(None)
-	print('new_set = {}'.format(new_set))
-	universal_selected = universal_selected - old_set
-	universal_selected = universal_selected | new_set
-	print('AFTER universal_selected = {}\n'.format(universal_selected))
+	global current_case
+	print('\tfrom inside on_selected_change')
+	print('\t\tdata_table.source.selected.indices = {}'.format(data_table.source.selected.indices))
+	cases[current_case].selected.indices = data_table.source.selected.indices[:]
+# 	global universal_selected
+# 	print('data_table.')
+# 	print('BEFORE universal_selected = {}'.format(universal_selected))
+# 	old_set = set(old)
+# 	old_set.discard(None)
+# 	print('old_set = {}'.format(old_set))
+# 	new_set = set(new)
+# 	new_set.discard(None)
+# 	print('new_set = {}'.format(new_set))
+# 	universal_selected = universal_selected - old_set
+# 	universal_selected = universal_selected | new_set
+# 	print('AFTER universal_selected = {}\n'.format(universal_selected))
 
 select_results = Button(label='Add GeneMapper Results', button_type='success')
 select_results.on_click(on_results_change)
 results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
 
-select_host_case = Select(title='Select Host', options=cases)
+select_host_case = Select(title='Select Host', options=list(cases.keys()))
 select_host_case.on_change('value', on_host_change)
 
-select_donor_case = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>', options=cases, size=12)
+select_donor_case = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>',
+								options=list(cases.keys()), size=12)
 select_donor_case.on_change('value', on_donor_change)
 
 export_template = Button(label='Export Template', button_type='success')
 export_template.on_click(on_export_template_change)
 export_text = TextInput(value='<template file>', disabled=True)
+
 
 columns = [
 			TableColumn(field='Sample File Name', title='Sample File Name', width=300),
@@ -125,6 +156,7 @@ columns = [
 			TableColumn(field='Allele', title='Allele', width=50),
 			TableColumn(field='Area', title='Area', width=50),
 			]
+
 
 source = ColumnDataSource()
 source.selected.on_change('indices', on_selected_change)
