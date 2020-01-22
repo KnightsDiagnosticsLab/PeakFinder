@@ -230,7 +230,7 @@ def border_add(border, top=None, right=None, left=None, bottom=None):
         top=top, left=left, right=right, bottom=bottom)
 
 
-def fix_formatting(filename, header, case_name):
+def fix_formatting(filename, header=None, case_name=None):
     print(filename)
     assert filename.endswith('.xlsx')
     thin = Side(border_style='thin')
@@ -250,12 +250,12 @@ def fix_formatting(filename, header, case_name):
     for cell in cells:
         cell.alignment = Alignment(horizontal='center')
 
-    # make first column bold and left aligned
-    cells = [ws['A' + str(r)] for r in range(1, ws.max_row + 1)]
+    # make first column bold and right aligned
+    cells = [ws['A' + str(r)] for r in range(1, ws.max_row - 1)]
     for cell in cells:
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal='left')
-        # cell.border = border_add(cell.border, right=medium)
+        # cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='right')
+        cell.border = border_add(cell.border, right=medium)
 
     # Make first two rows bold and left aligned
     cells = [ws[c + str(i)] for i in range(1, 3)
@@ -296,12 +296,14 @@ def fix_formatting(filename, header, case_name):
         cell.border = border_add(cell.border, right=medium)
 
     # add in case_name
-    loc = location_of_value(ws, 'Post-T:')
-    # c =
-    cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
-    cell.value = case_name
+    if case_name is not None:
+        loc = location_of_value(ws, 'Post-T:')
+        # c =
+        cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
+        cell.value = case_name
 
-    ws.oddHeader = header
+    if header is not None:
+        ws.oddHeader = header
     ws.sheet_view.view = 'pageLayout'
     openpyxl.worksheet.worksheet.Worksheet.set_printer_settings(
         ws, paper_size=1, orientation='landscape')

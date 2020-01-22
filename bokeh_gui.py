@@ -10,16 +10,16 @@ from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askdirectory, asksaveasfilename
 
 import pandas as pd
-
 from fsa import use_csv_module
-
 import copy
+import openpyxl
 
-# df = pd.DataFrame()
+from extract_from_genemapper import fix_formatting
+
+
 results_files = []
-cases_source = {}
-# tables = {}
-# universal_selected = set()
+source_cases = {}
+df_cases = {}
 
 
 def reduce_rows(df):
@@ -41,31 +41,26 @@ def on_donor_change(attrname, old, new):
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
 		current_case = newest[0]
-		# indices = df.index[df['Sample File Name'] == newest[0]].tolist()
-		# view = CDSView(source=source, filters=[IndexFilter(indices)])
-		# data_table.view = view
-		# data_table.source.selected.indices = sorted(list(universal_selected))
-		# data_table = tables[newest[0]]
-		data_table.source.data = cases_source[newest[0]].data
-		data_table.source.selected.indices = cases_source[newest[0]].selected.indices[:]
+		data_table.source.data = source_cases[newest[0]].data
+		data_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
 
 
-def on_host_change(attrname, old, new):
+def on_host_click(attrname, old, new):
 	# print(new)
-	global cases_source, data_table, current_case
+	global source_cases, data_table, current_case
 	current_case = new
 	# indices = df.index[df['Sample File Name'] == new].tolist()
 	# view = CDSView(source=source, filters=[IndexFilter(indices)])
 	# data_table.view = view
 	# data_table.source.selected.indices = sorted(list(universal_selected))
-	data_table.source.data = cases_source[new].data
-	data_table.source.selected.indices = cases_source[new].selected.indices[:]
+	data_table.source.data = source_cases[new].data
+	data_table.source.selected.indices = source_cases[new].selected.indices[:]
 	# curdoc().add_root(tables[new])
 
 
 
-def on_results_change():
-	global cases_source, results_files, df, source, data_table, results
+def on_results_click():
+	global source_cases, results_files, df, source, data_table
 
 	root = tk.Tk()
 	root.withdraw()		# hide the root tk window
@@ -81,33 +76,30 @@ def on_results_change():
 		results_text.value = '\n'.join(results_files)
 
 		df_new = use_csv_module(file_path)
-		# df_new.index.name = 'Index'
 		df_new = reduce_rows(df_new)
-		# df = pd.concat([df, df_new], axis=0, sort=False, ignore_index=True)
-	
-		# source = ColumnDataSource(df)
-		# data_table.source.data = source.data		# This will probably reset the selected indices
 
 		case_names = sorted(list(set(df_new['Sample File Name'].to_list())))
+		# if len(case_names) > 10:
+		# 	print(case_names)
+		# 	select_donor_case.size = len(case_names)
+		# 	print('select_donor_case.size = {}'.format(select_donor_case.size))
 
 		for case in case_names:
 			df_copy = df_new.loc[df_new['Sample File Name'] == case].copy(deep=True)
 			df_copy.reset_index(inplace=True, drop=True)
+			df_copy['Selected'] = False
 			indices = pre_selected_indices(df_copy)
-			cases_source[case] = ColumnDataSource(df_copy)
-			cases_source[case].selected.indices = indices
-			# cases_source[case].selected.on_change('indices', on_selected_change)
-			# table = DataTable(columns=columns, source=cases_source[case], selectable='checkbox')
-			# table.source.selected.on_change('indices', on_selected_change)
-			# tables[case] = DataTable(columns=columns, source=cases_source[case], selectable='checkbox')
-			# tables[case] = table
+			df_copy.loc[indices,'Selected'] = True
+			df_cases[case] = df_copy
+			# print(df_copy)
+			source_cases[case] = ColumnDataSource(df_copy)
+			source_cases[case].selected.indices = indices
 
-
-		select_host_case.options = list(cases_source.keys())
-		select_donor_case.options = list(cases_source.keys())
+		select_host_case.options = list(source_cases.keys())
+		select_donor_case.options = list(source_cases.keys())
 
 	if len(results_files) == 1:
-		select_host_case.value = list(cases_source.keys())[0]
+		select_host_case.value = list(source_cases.keys())[0]
 
 
 def pre_selected_indices(df):
@@ -122,14 +114,99 @@ def pre_selected_indices(df):
 		area = df.iloc[i].loc['Area']
 		if area >= 0.6 * marker_area_max[marker]:
 			indices.append(i)
-		# print(marker)
-	# print(df)
-	# for row in df:
-	# 	print(row)
 	return indices
 
 
-def on_export_template_change():
+def string_to_number(s):
+	try:
+		s = float(s)
+	except:
+		pass
+	return s
+
+
+def save_excel_file(file_path):
+	markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
+	host_case = select_host_case.value
+	df_host = df_cases[host_case]
+	df_host = df_host.loc[df_host['Selected'] == True]
+
+	donor_cases = select_donor_case.value
+	donors = {}
+	for donor_case in donor_cases:
+		df_donor = df_cases[donor_case]
+		df_donor = df_donor.loc[df_donor['Selected'] == True]
+		donors[donor_case] = df_donor.copy(deep=True)
+
+	wb = openpyxl.Workbook()
+	ws = wb.active
+	'''	Header, etc.
+	'''
+	ws.oddHeader.center.text = enter_host_name.value
+	# ws.oddHeader.center.size = 14
+	ws.cell(row=2, column=1, value='Marker')
+	ws.cell(row=2, column=2, value='Host')
+	ws.cell(row=1, column=2, value=host_case)
+	for i, donor_case in enumerate(donor_cases):
+		c = 4 + 2*i
+		ws.cell(row=1, column=c, value=donor_case)
+		if len(donor_cases) == 1:
+			donor_num = 'Donor'
+		else:
+			donor_num = 'Donor ' + str(i+1)
+		ws.cell(row=2, column=c, value=donor_num)
+
+	'''	Markers & Alleles
+	'''
+	for i, marker in enumerate(markers):
+		r = 1+(i+1)*2
+		df_marker = df_host.loc[df_host['Marker'] == marker]
+		ws.cell(row=r, column=1, value=marker)
+		# print(df_marker)
+		for j, allele in enumerate(df_marker['Allele']):
+			# print(marker, j, allele)
+			allele = string_to_number(allele)
+			c = j+2
+			ws.cell(row=r, column=c, value=allele)
+		
+		for j, donor in enumerate(donors.keys()):
+			df_donor = donors[donor]
+			df_marker = df_donor.loc[df_donor['Marker'] == marker]
+			for k, allele in enumerate(df_marker['Allele']):
+				allele = string_to_number(allele)
+				c = (4 + 2*j) + k
+				ws.cell(row=r, column=c, value=allele)
+
+	''' Add in column of Allele/Area
+	'''
+	caa = 2*len(donors.keys()) + 4
+	for i, marker in enumerate(markers):
+		r1 = 1+(i+1)*2
+		r2 = r1 + 1
+		ws.cell(row=r1, column=caa, value='Allele')
+		ws.cell(row=r2, column=caa, value='Area')
+
+	''' Copy columns
+	'''
+	for i in range(2,caa,2):
+		for r in range(2,ws.max_row + 1):
+			c1 = 2*caa - (i+1)
+			c2 = c1 + 1
+			ws.cell(row=r, column=c1, value=ws.cell(row=r, column=i).value)
+			ws.cell(row=r, column=c2, value=ws.cell(row=r, column=i+1).value)
+
+	'''	Add in % Host & Forumula columns
+	'''
+	ws.cell(row=2, column=2*caa - 1, value='% Host')
+	ws.cell(row=2, column=2*caa, value='Formula')
+	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Host')
+	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Donor')
+	wb.save(file_path)
+	fix_formatting(file_path)
+	# wb.save(file_path)
+
+
+def on_export_template_click():
 	root = tk.Tk()
 	root.withdraw()		# hide the root tk window
 	file_path = asksaveasfilename(defaultextension = '.xlsx',
@@ -137,41 +214,38 @@ def on_export_template_change():
 									title = 'Save Template')
 	root.destroy()
 	export_text.value = basename(file_path)
+	save_excel_file(file_path)
 
 
 def on_selected_change(attrname, old, new):
 	global current_case
-	# print('\tfrom inside on_selected_change')
-	# print('\t\tdata_table.source.selected.indices = {}'.format(data_table.source.selected.indices))
-	cases_source[current_case].selected.indices = data_table.source.selected.indices[:]
-# 	global universal_selected
-# 	print('data_table.')
-# 	print('BEFORE universal_selected = {}'.format(universal_selected))
-# 	old_set = set(old)
-# 	old_set.discard(None)
-# 	print('old_set = {}'.format(old_set))
-# 	new_set = set(new)
-# 	new_set.discard(None)
-# 	print('new_set = {}'.format(new_set))
-# 	universal_selected = universal_selected - old_set
-# 	universal_selected = universal_selected | new_set
-# 	print('AFTER universal_selected = {}\n'.format(universal_selected))
+
+	indices = data_table.source.selected.indices[:]
+	source_cases[current_case].selected.indices = indices[:]
+	df_cases[current_case].loc[:,'Selected'] = False
+	df_cases[current_case].loc[indices,'Selected'] = True
+	# print(df_cases[current_case])
 
 select_results = Button(label='Add GeneMapper Results', button_type='success')
-select_results.on_click(on_results_change)
+select_results.on_click(on_results_click)
 results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
 
-select_host_case = Select(title='Select Host', options=list(cases_source.keys()))
-select_host_case.on_change('value', on_host_change)
+
+select_host_case = Select(title='Select Host', options=list(source_cases.keys()))
+select_host_case.on_change('value', on_host_click)
+
 
 select_donor_case = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>',
-								options=list(cases_source.keys()), size=12)
+								options=list(source_cases.keys()), size=20)
 select_donor_case.on_change('value', on_donor_change)
 
-export_template = Button(label='Export Template', button_type='success')
-export_template.on_click(on_export_template_change)
+
+export_template = Button(label='Export Template', button_type='warning')
+export_template.on_click(on_export_template_click)
 export_text = TextInput(value='<template file>', disabled=True)
 
+
+enter_host_name = TextInput(title='Enter Host Name', value='<type host name here>')
 
 columns = [
 			TableColumn(field='Sample File Name', title='Sample File Name', width=300),
@@ -180,22 +254,22 @@ columns = [
 			TableColumn(field='Area', title='Area', width=50),
 			]
 
+col_temp = [
+			TableColumn(field='Marker', title='Marker', width=75),
+			TableColumn(field='Allele_1', title='Allele_1', width=50),
+			TableColumn(field='Allele_2', title='Allele_2', width=50),
+			]
+
 
 source = ColumnDataSource()
 source.selected.on_change('indices', on_selected_change)
 data_table = DataTable(columns=columns, source=source, selectable='checkbox')
+template_table = DataTable(source=ColumnDataSource())
 
+col_0 = column(enter_host_name, select_results, results_text, select_host_case, select_donor_case, export_template)
+col_1 = column(data_table, sizing_mode='stretch_height')
 
-grid = gridplot(
-				[[select_results, results_text],
-				[None, select_host_case],
-				[None, select_donor_case]],
-				merge_tools=True,
-				toolbar_options=dict(logo=None)
-			)
-
-curdoc().add_root(grid)
-curdoc().add_root(column(data_table, sizing_mode='stretch_height'))
+curdoc().add_root(row(col_0, col_1, sizing_mode='stretch_height'))
 curdoc().title = 'PTE'
 
 
