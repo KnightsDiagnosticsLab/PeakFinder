@@ -203,7 +203,7 @@ def save_excel_file(file_path):
 	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Donor')
 	wb.save(file_path)
 	fix_formatting(file_path)
-	# wb.save(file_path)
+	print('Done saving {}'.format(file_path))
 
 
 def on_export_template_click():
