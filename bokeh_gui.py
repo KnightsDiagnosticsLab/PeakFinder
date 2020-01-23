@@ -334,7 +334,7 @@ def make_template_xlsx(file_path):
 				H_alle_val = h2_alle_val
 				H_area = h2_area
 
-			f2.value = '(1-(2*{}/({}+{})))'.format(A_alle_val,
+			f2.value = '1 - (2x{}/({} + {}))'.format(A_alle_val,
 													A_alle_val,
 													H_alle_val)
 
@@ -357,7 +357,7 @@ def make_template_xlsx(file_path):
 				D_alle_val = d2_alle_val
 				D_area = d2_area
 
-			f1.value = '2 * {}'.format(A_alle_val)
+			f1.value = '2x{}'.format(A_alle_val)
 			f1.alignment = Alignment(horizontal='center')
 
 			f2.value = '{} + {}'.format(A_alle_val,
@@ -422,12 +422,16 @@ def on_select_template_click():
 	template_text.value = basename(file_path)
 	global template_path
 	template_path = file_path
-	df = pd.read_excel(template_path)
-	df.loc[-2] = ''
-	df.loc[-1] = df.columns.tolist()
-	df.index = df.index + 2
+	wb = openpyxl.load_workbook(file_path)
+	ws = wb.worksheets[0]
+	# df = pd.read_excel(template_path)
+	df = pd.DataFrame(ws.values)
+	# print(df)
+	df.loc[-1] = ''
+	# df.loc[-1] = df.columns.tolist()
+	df.index = df.index + 1
 	df.sort_index(inplace=True)
-	col_letters = [openpyxl.utils.get_column_letter(i+1) for i in range(0,len(df.columns.tolist()))]
+	col_letters = [openpyxl.utils.get_column_letter(i+1) for i in df.columns.tolist()]
 	df.columns = col_letters
 	df = df.fillna('')
 	columns = [TableColumn(field=col, title=col) for col in df.columns.tolist()]
