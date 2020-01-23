@@ -385,6 +385,7 @@ def make_template_xlsx(file_path):
 	'''	Fix formatting
 	'''
 	fix_formatting(file_path)
+	print('Done saving {}'.format(file_path))
 
 
 def on_export_template_click():
