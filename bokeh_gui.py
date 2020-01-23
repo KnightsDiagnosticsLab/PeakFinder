@@ -14,6 +14,8 @@ from fsa import use_csv_module, fix_formatting
 import copy
 import openpyxl
 from openpyxl.styles import Alignment
+from extract_from_genemapper import build_results_dict, build_profile_2
+
 
 pd.set_option('display.max_columns', 20)
 
@@ -31,19 +33,19 @@ def reduce_rows(df):
 
 
 def on_donor_change(attrname, old, new):
-	global data_table, current_case
+	global data_table, panel0_current_case
 
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
-		current_case = newest[0]
+		panel0_current_case = newest[0]
 		data_table.source.data = source_cases[newest[0]].data
 		data_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
 
 
 def on_host_click(attrname, old, new):
-	global source_cases, data_table, current_case
+	global source_cases, data_table, panel0_current_case
 
-	current_case = new
+	panel0_current_case = new
 	data_table.source.data = source_cases[new].data
 	data_table.source.selected.indices = source_cases[new].selected.indices[:]
 
@@ -401,13 +403,13 @@ def on_export_template_click():
 		make_template_xlsx(file_path)
 
 
-def on_selected_change(attrname, old, new):
-	global current_case, df_cases
+def on_select_alleles_change(attrname, old, new):
+	global panel0_current_case, df_cases
 
 	indices = data_table.source.selected.indices[:]
-	source_cases[current_case].selected.indices = indices[:]
-	df_cases[current_case].loc[:,'Selected'] = False
-	df_cases[current_case].loc[indices,'Selected'] = True
+	source_cases[panel0_current_case].selected.indices = indices[:]
+	df_cases[panel0_current_case].loc[:,'Selected'] = False
+	df_cases[panel0_current_case].loc[indices,'Selected'] = True
 
 
 def on_select_template_click():
@@ -458,6 +460,21 @@ def on_populate_results_click():
 
 		populate_template_xlsx(file_path)
 
+
+def on_select_samples_change(attrname, old, new):
+	global panel1_current_case
+
+	newest = [c for c in new if c not in old]
+	if len(newest) > 0:
+		panel1_current_case = newest[0]
+		df = df_cases[panel1_current_case]
+		print(df)
+		results = build_results_dict(df)
+		print(results)
+		# data_table.source.data = source_cases[newest[0]].data
+		# data_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+
+
 results_files = []
 source_cases = {}
 df_cases = {}
@@ -493,10 +510,11 @@ template_text = TextAreaInput(value='<template file>', disabled=True)
 select_samples = MultiSelect(title='Select Sample(s) <ctrl+click to multiselect>',
 									options=[],
 									size=20)
+select_samples.on_change('value', on_select_samples_change)
 
-
-populate_results = Button(label='Populate Results', button_type='warning')
+populate_results = Button(label='Export Results To Excel File', button_type='warning')
 populate_results.on_click(on_populate_results_click)
+
 
 columns = [TableColumn(field='Sample File Name', title='Sample File Name', width=300),
 			TableColumn(field='Marker', title='Marker', width=75),
@@ -505,7 +523,7 @@ columns = [TableColumn(field='Sample File Name', title='Sample File Name', width
 
 
 source = ColumnDataSource()
-source.selected.on_change('indices', on_selected_change)
+source.selected.on_change('indices', on_select_alleles_change)
 data_table = DataTable(columns=columns, source=source, selectable='checkbox')
 template_table = DataTable(source=ColumnDataSource())
 
