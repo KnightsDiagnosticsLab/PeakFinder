@@ -5,6 +5,7 @@ from openpyxl.styles import Border, Side, PatternFill, Font, GradientFill, Align
 import string
 import win32com.client as win32
 
+
 def use_csv_module(filename):
 	with open(filename, newline='') as csvfile:
 		dialect = csv.Sniffer().sniff(csvfile.read(1024))
@@ -16,10 +17,6 @@ def use_csv_module(filename):
 	df.replace(r'^\s*$', pd.np.nan, regex=True, inplace=True)
 	# print(df)
 	return df
-
-
-
-
 
 
 def fix_formatting(filename, header=None, case_name=None):
@@ -46,8 +43,9 @@ def fix_formatting(filename, header=None, case_name=None):
 	# row_count = ws.max_row
 	# column_count = ws.max_column
 
-	# insert header
-	# ws.oddHeader = header
+	'''	Insert header '''
+	if header is not None:
+		ws.oddHeader = header
 
 	''' By default make all cells horizontal='center', except for the first and last two columns
 	'''
@@ -56,22 +54,21 @@ def fix_formatting(filename, header=None, case_name=None):
 	for cell in cells:
 		cell.alignment = Alignment(horizontal='center')
 
-	''' Make first column bold and right aligned
-	'''
+	''' Make first column bold and right aligned '''
 	cells = [ws['A' + str(r)] for r in range(3, ws.max_row - 1)]
 	for cell in cells:
 		# cell.font = Font(bold=True)
 		cell.alignment = Alignment(horizontal='right')
 		cell.border = border_add(cell.border, right=medium)
 
-	''' Make first two rows bold and left aligned
-	'''
+	''' Make first two rows bold and left aligned '''
 	cells = [ws[c + str(i)] for i in range(1, 3)
 			 for c in string.ascii_uppercase[0:ws.max_column]]
 	for cell in cells:
 		cell.font = Font(bold=True)
 		cell.alignment = Alignment(horizontal='left')
-	# get locations of 'Allele'
+
+	'''	Get locations of 'Allele' '''
 	allele_ij = []
 	for i in df.index:
 		for j, v in enumerate(df.iloc[i]):
@@ -104,13 +101,12 @@ def fix_formatting(filename, header=None, case_name=None):
 		cell = ws[string.ascii_uppercase[2 * j] + str(i + 3)]
 		cell.border = border_add(cell.border, right=medium)
 
-	''' Add in case_name
-	'''
+	''' Add in case_name '''
 	if case_name is not None:
 		loc = location_of_value(ws, 'Post-T:')
-		# c =
-		cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
-		cell.value = case_name
+		if loc is not None:
+			cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
+			cell.value = case_name
 
 	if header is not None:
 		ws.oddHeader = header
@@ -124,3 +120,16 @@ def fix_formatting(filename, header=None, case_name=None):
 	ws.page_margins.header = 0.1
 
 	wb.save(filename)
+	wb.close()  # FileFormat = 56 is for .xls extension
+
+
+def location_of_value(ws, val):
+	loc = None
+	for j in range(1, ws.max_row + 1):
+		for i in range(0, ws.max_column):
+			c = string.ascii_uppercase[i]
+			cell = ws[c + str(j)]
+			if val == cell.value:
+				loc = (c, j)
+				print('loc of {} = {}'.format(val, loc))
+				return loc
