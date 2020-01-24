@@ -14,6 +14,8 @@ from fsa import use_csv_module, fix_formatting
 import copy
 import openpyxl
 from openpyxl.styles import Alignment
+from extract_from_genemapper import build_results_dict, build_profile_2, get_header, convert_xls_to_xlsx
+import re
 
 pd.set_option('display.max_columns', 20)
 
@@ -31,25 +33,42 @@ def reduce_rows(df):
 
 
 def on_donor_change(attrname, old, new):
-	global data_table, current_case
+	global allele_table_p0c1, p0_current_case
 
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
-		current_case = newest[0]
-		data_table.source.data = source_cases[newest[0]].data
-		data_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+		p0_current_case = newest[0]
+		allele_table_p0c1.source.data = source_cases[newest[0]].data
+		allele_table_p0c1.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+
+		''' Preview Template '''
+		wb = make_template_wb()
+		ws = wb.worksheets[0]
+		df = pd.DataFrame(ws.values)
+		df.loc[-1] = ''
+		# df.loc[-1] = df.columns.tolist()
+		df.index = df.index + 1
+		df.sort_index(inplace=True)
+		col_letters = [openpyxl.utils.get_column_letter(i+1) for i in df.columns.tolist()]
+		df.columns = col_letters
+		df = df.fillna('')
+		df_col = df.columns.tolist()
+		columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+		template_table_p0c2.columns = columns
+		template_table_p0c2.source.data = ColumnDataSource(df).data
 
 
 def on_host_click(attrname, old, new):
-	global source_cases, data_table, current_case
+	global source_cases, allele_table_p0c1, p0_current_case
 
-	current_case = new
-	data_table.source.data = source_cases[new].data
-	data_table.source.selected.indices = source_cases[new].selected.indices[:]
+	p0_current_case = new
+	allele_table_p0c1.source.data = source_cases[new].data
+	allele_table_p0c1.source.selected.indices = source_cases[new].selected.indices[:]
 
 
 def on_results_click():
-	global source_cases, results_files, df, source, data_table, df_cases
+	global source_cases, results_files, df, allele_table_p0c1, df_cases
 
 	root = tk.Tk()
 	root.attributes("-topmost", True)
@@ -104,7 +123,7 @@ def pre_selected_indices(df):
 	return indices
 
 
-def make_template_xlsx(file_path):
+def make_template_wb(file_path=None):
 
 	''' Helper function '''
 	def string_to_number(s):
@@ -249,9 +268,11 @@ def make_template_xlsx(file_path):
 													d1_alle_val,
 													d2_alle_val)
 
-			percent_host.value = '=100*SUM({}:{})/SUM({}:{})'.format(h1_area.coordinate,
+			percent_host.value = '=100*SUM({}:{})/SUM({},{},{},{})'.format(h1_area.coordinate,
 																h2_area.coordinate,
 																d1_area.coordinate,
+																d2_area.coordinate,
+																h1_area.coordinate,
 																h2_area.coordinate)
 
 		if len(h) == 1 and len(h | d) == 3:
@@ -262,8 +283,9 @@ def make_template_xlsx(file_path):
 											d1_alle_val,
 											d2_alle_val)
 
-			percent_host.value = '=100*{}/SUM({}:{})'.format(h1_area.coordinate,
+			percent_host.value = '=100*{}/SUM({},{},{})'.format(h1_area.coordinate,
 														d1_area.coordinate,
+														d2_area.coordinate,
 														h1_area.coordinate)
 
 		if len(d) == 1 and len( h | d) == 3:
@@ -275,7 +297,7 @@ def make_template_xlsx(file_path):
 											h2_alle_val,
 											d1_alle_val)
 
-			percent_host.value = '=100*SUM({}:{})/SUM({},{}:{})'.format(h1_area.coordinate,
+			percent_host.value = '=100*SUM({}:{})/SUM({},{},{})'.format(h1_area.coordinate,
 																h2_area.coordinate,
 																d1_area.coordinate,
 																h1_area.coordinate,
@@ -378,14 +400,17 @@ def make_template_xlsx(file_path):
 	percent_donor_avg = ws.cell(row=4+2*len(markers), column=percent_host_col)
 	percent_donor_avg.value = '=100-{}'.format(percent_host_avg.coordinate)
 
-	'''	Save the file before running fix_formatting
-	'''
-	wb.save(file_path)
+	if file_path is not None:
+		if file_path.endswith('.xlsx'):
+			'''	Save the file before running fix_formatting '''
+			wb.save(file_path)
+			wb.close()
 
-	'''	Fix formatting
-	'''
-	fix_formatting(file_path)
-	print('Done saving {}'.format(file_path))
+			'''	Fix formatting '''
+			fix_formatting(file_path)
+			print('Done saving {}'.format(file_path))
+
+	return wb
 
 
 def on_export_template_click():
@@ -394,29 +419,41 @@ def on_export_template_click():
 	root.withdraw()		# hide the root tk window
 	file_path = asksaveasfilename(defaultextension = '.xlsx',
 									filetypes=[('Excel', '*.xlsx')],
-									title = 'Save Template')
+									title = 'Save Template',
+									initialfile=enter_host_name.value)
 	root.destroy()
 	# print('******** file_path = {} '.format(file_path))
 	if file_path.endswith('.xlsx'):
-		make_template_xlsx(file_path)
+		make_template_wb(file_path)
 
 
-def on_selected_change(attrname, old, new):
-	global current_case, df_cases
+def on_select_alleles_change(attrname, old, new):
+	global p0_current_case, df_cases
 
-	indices = data_table.source.selected.indices[:]
-	source_cases[current_case].selected.indices = indices[:]
-	df_cases[current_case].loc[:,'Selected'] = False
-	df_cases[current_case].loc[indices,'Selected'] = True
+	indices = allele_table_p0c1.source.selected.indices[:]
+	source_cases[p0_current_case].selected.indices = indices[:]
+	df_cases[p0_current_case].loc[:,'Selected'] = False
+	df_cases[p0_current_case].loc[indices,'Selected'] = True
 
 
 def on_select_template_click():
 	root = tk.Tk()
 	root.attributes("-topmost", True)
 	root.withdraw()		# hide the root tk window
-	file_path = askopenfilename(filetypes=[('Excel', '*.xlsx')],
-								title = 'Choose Template')
+	file_path = askopenfilename(filetypes=[
+											('Excel', '*.xlsx'),
+											# ('Excel', '*.xls'),
+										],
+								title = 'Choose Template',
+								initialdir=r'X:\Hospital\Genetics Lab\DNA_Lab\3-Oncology Tests\Engraftment\Allele Charts')
 	root.destroy()
+
+	''' Convert xls to xlsx if needed '''
+	if file_path.endswith('.xls'):
+		file_path = convert_xls_to_xlsx(file_path)
+
+	'''	Need to deal with allele cells that equal other cells '''
+
 
 	''' Update template_text box'''
 	template_text.value = basename(file_path)
@@ -426,6 +463,7 @@ def on_select_template_click():
 	ws = wb.worksheets[0]
 	# df = pd.read_excel(template_path)
 	df = pd.DataFrame(ws.values)
+	wb.close()
 	# print(df)
 	df.loc[-1] = ''
 	# df.loc[-1] = df.columns.tolist()
@@ -434,29 +472,66 @@ def on_select_template_click():
 	col_letters = [openpyxl.utils.get_column_letter(i+1) for i in df.columns.tolist()]
 	df.columns = col_letters
 	df = df.fillna('')
-	columns = [TableColumn(field=col, title=col) for col in df.columns.tolist()]
-	template_table.columns = columns
-	template_table.source.data = ColumnDataSource(df).data
+	df_col = df.columns.tolist()
+	columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+	columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+	template_table_p1c1.columns = columns
+	template_table_p1c1.source.data = ColumnDataSource(df).data
 
 
-def populate_template_xlsx(file_path):
-	# assert file_path.endswith('.xlsx')
-	# wb = openpyxl.load_workbook(file_path)
-	# ws = wb.worksheets[0]
-	pass
+def on_export_results_click():
+	global template_path
 
+	header = get_header(template_path)
+	patient_name = header.center.text
 
-def on_populate_results_click():
 	for sample in select_samples.value:
+		'''	Construct output file name '''
+		output_file_name = patient_name + ' ' + re.sub(r'_PTE.*$', '', sample)
 		root = tk.Tk()
 		root.attributes("-topmost", True)
 		root.withdraw()		# hide the root tk window
-		file_path = asksaveasfilename(defaultextension='.xlsx',
+		output_file_name = asksaveasfilename(defaultextension='.xlsx',
 										filetypes=[('Excel', '*.xlsx')],
-										title='Populate results for {}'.format(sample))
+										title='Populate results for {}'.format(sample),
+										initialfile = output_file_name)
 		root.destroy()
 
-		populate_template_xlsx(file_path)
+		df = df_cases[sample]
+		# print(df)
+		results = build_results_dict(df)
+		# print(results)
+		df_filled = build_profile_2(results, sample, template_path)
+		# print(df_filled)
+
+		# col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
+		# df_filled.columns = col_letters
+		df_filled = df_filled.fillna('')
+		df_filled.to_excel(output_file_name, index=False, header=False)
+		fix_formatting(output_file_name, header)
+
+
+def on_select_samples_change(attrname, old, new):
+	global panel1_current_case, template_path
+
+	newest = [c for c in new if c not in old]
+	if len(newest) > 0:
+		panel1_current_case = newest[0]
+		df = df_cases[panel1_current_case]
+		# print(df)
+		results = build_results_dict(df)
+		# print(results)
+		df_filled = build_profile_2(results, panel1_current_case, template_path)
+
+		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
+		df_filled.columns = col_letters
+		df_filled = df_filled.fillna('')
+		df_col = df_filled.columns.tolist()
+		columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+		template_table_p1c1.columns = columns
+		template_table_p1c1.source.data = ColumnDataSource(df_filled).data
+
 
 results_files = []
 source_cases = {}
@@ -493,43 +568,48 @@ template_text = TextAreaInput(value='<template file>', disabled=True)
 select_samples = MultiSelect(title='Select Sample(s) <ctrl+click to multiselect>',
 									options=[],
 									size=20)
+select_samples.on_change('value', on_select_samples_change)
 
+export_results = Button(label='Export Results To Excel File', button_type='warning')
+export_results.on_click(on_export_results_click)
 
-populate_results = Button(label='Populate Results', button_type='warning')
-populate_results.on_click(on_populate_results_click)
 
 columns = [TableColumn(field='Sample File Name', title='Sample File Name', width=300),
-			TableColumn(field='Marker', title='Marker', width=75),
+			TableColumn(field='Marker', title='Marker', width=50),
 			TableColumn(field='Allele', title='Allele', width=50),
 			TableColumn(field='Area', title='Area', width=50)]
 
 
 source = ColumnDataSource()
-source.selected.on_change('indices', on_selected_change)
-data_table = DataTable(columns=columns, source=source, selectable='checkbox')
-template_table = DataTable(source=ColumnDataSource())
+source.selected.on_change('indices', on_select_alleles_change)
+
+allele_table_p0c1 = DataTable(columns=columns, source=source, selectable='checkbox', fit_columns=True)
+template_table_p0c2 = DataTable(source=ColumnDataSource(), fit_columns=True)
+template_table_p1c1 = DataTable(source=ColumnDataSource(), fit_columns=True)
 
 
-col_0 = column(enter_host_name,
+p0c0 = column(enter_host_name,
 				select_results,
 				results_text,
 				select_host_case,
 				select_donor_cases,
 				export_template)
 
-col_1 = column(data_table, sizing_mode='stretch_height')
+p0c1 = column(allele_table_p0c1, sizing_mode='stretch_height')
 
-col_2 = column(select_results,
+p0c2 = column(template_table_p0c2, sizing_mode='scale_height')
+
+p1c0 = column(select_results,
 				results_text,
 				select_template,
 				template_text,
 				select_samples,
-				populate_results)
+				export_results)
 
-col_3 = column(template_table, sizing_mode='stretch_both')
+p1c1 = column(template_table_p1c1, sizing_mode='scale_height')
 
-child_0 = row(col_0, col_1, sizing_mode='stretch_height')
-child_1 = row(col_2, col_3, sizing_mode='stretch_height')
+child_0 = row(p0c0, p0c1, p0c2, sizing_mode='stretch_height')
+child_1 = row(p1c0, p1c1, sizing_mode='stretch_height')
 tab1 = Panel(child=child_0, title='Make Template')
 tab2 = Panel(child=child_1, title='Populate Results')
 tabs = Tabs(tabs=[tab1, tab2])
