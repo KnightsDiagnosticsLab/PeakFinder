@@ -2,8 +2,37 @@ import csv
 import pandas as pd
 import openpyxl
 from openpyxl.styles import Border, Side, PatternFill, Font, GradientFill, Alignment
-import string
+from string import ascii_uppercase
+import random
+
 import win32com.client as win32
+import easygui
+
+def convert_xls_to_xlsx(file_path=None):
+	if file_path is None:
+		file_path = easygui.fileopenbox(msg='Select .xls file to convert to .xlsx')
+	file_path = file_path.replace('/', '\\')
+	# print(file_path)
+	excel = win32.gencache.EnsureDispatch('Excel.Application')
+	wb = excel.Workbooks.Open(file_path)
+	# xl = win32.Dispatch("Excel.Application")
+	# print(xl.ActiveWorkbook.FullName)
+	# print(wb.Name)
+	wb.Name = str(wb.Name) + 'x'
+	# print(wb.Name, '\n\n\n\n\n\n')
+	new_file_path = file_path + 'x'
+	wb.SaveAs(Filename=new_file_path, FileFormat = 51)    #FileFormat = 51 is for .xlsx extension
+	wb.Close()                               #FileFormat = 56 is for .xls extension
+	excel.Application.Quit()
+	return new_file_path
+
+def get_col_to_drop(df):
+	col_to_drop = []
+	for col in df.columns:
+		# if 'Unnamed' in str(col) and df[col].isnull().all():
+		if df[col].isnull().all():
+			col_to_drop.append(col)
+	return col_to_drop
 
 
 def use_csv_module(filename):
@@ -40,8 +69,6 @@ def fix_formatting(filename, header=None, case_name=None):
 	df = pd.read_excel(filename)
 	wb = openpyxl.load_workbook(filename)
 	ws = wb.worksheets[0]
-	# row_count = ws.max_row
-	# column_count = ws.max_column
 
 	'''	Insert header '''
 	if header is not None:
@@ -49,7 +76,7 @@ def fix_formatting(filename, header=None, case_name=None):
 
 	''' By default make all cells horizontal='center', except for the first and last two columns
 	'''
-	cells = [ws[c + str(r)] for c in string.ascii_uppercase[1:ws.max_column-1]
+	cells = [ws[c + str(r)] for c in ascii_uppercase[1:ws.max_column-1]
 			 for r in range(1, ws.max_row + 1)]
 	for cell in cells:
 		cell.alignment = Alignment(horizontal='center')
@@ -63,7 +90,7 @@ def fix_formatting(filename, header=None, case_name=None):
 
 	''' Make first two rows bold and left aligned '''
 	cells = [ws[c + str(i)] for i in range(1, 3)
-			 for c in string.ascii_uppercase[0:ws.max_column]]
+			 for c in ascii_uppercase[0:ws.max_column]]
 	for cell in cells:
 		cell.font = Font(bold=True)
 		cell.alignment = Alignment(horizontal='left')
@@ -79,26 +106,26 @@ def fix_formatting(filename, header=None, case_name=None):
 	'''
 	for i, j in allele_ij:
 		for k in range(0, ws.max_column):
-			cell = ws[string.ascii_uppercase[k] + str(i + 3)]
+			cell = ws[ascii_uppercase[k] + str(i + 3)]
 			cell.border = border_add(cell.border, bottom=medium)
 
 		for k in range(0, j, 2):
-			cell = ws[string.ascii_uppercase[k] + str(i + 2)]
+			cell = ws[ascii_uppercase[k] + str(i + 2)]
 			cell.border = border_add(cell.border, right=medium)
 
-			cell = ws[string.ascii_uppercase[k] + str(i + 3)]
+			cell = ws[ascii_uppercase[k] + str(i + 3)]
 			cell.border = border_add(cell.border, right=medium)
 
-			cell = ws[string.ascii_uppercase[k + j] + str(i + 2)]
+			cell = ws[ascii_uppercase[k + j] + str(i + 2)]
 			cell.border = border_add(cell.border, right=medium)
 
-			cell = ws[string.ascii_uppercase[k + j] + str(i + 3)]
+			cell = ws[ascii_uppercase[k + j] + str(i + 3)]
 			cell.border = border_add(cell.border, right=medium)
 
-		cell = ws[string.ascii_uppercase[2 * j] + str(i + 2)]
+		cell = ws[ascii_uppercase[2 * j] + str(i + 2)]
 		cell.border = border_add(cell.border, right=medium)
 
-		cell = ws[string.ascii_uppercase[2 * j] + str(i + 3)]
+		cell = ws[ascii_uppercase[2 * j] + str(i + 3)]
 		cell.border = border_add(cell.border, right=medium)
 
 	''' Add in case_name '''
@@ -119,6 +146,11 @@ def fix_formatting(filename, header=None, case_name=None):
 	ws.page_margins.right = 0.5
 	ws.page_margins.header = 0.1
 
+	ws.sheet_properties.pageSetUpPr.fitToPage = True
+	ws.page_setup.fitToHeight = False
+
+	ws.page_setup.fitToWidth = 1
+
 	wb.save(filename)
 	wb.close()  # FileFormat = 56 is for .xls extension
 
@@ -126,10 +158,12 @@ def fix_formatting(filename, header=None, case_name=None):
 def location_of_value(ws, val):
 	loc = None
 	for j in range(1, ws.max_row + 1):
-		for i in range(0, ws.max_column):
-			c = string.ascii_uppercase[i]
+		for i in range(1, ws.max_column + 1):
+			c = ascii_uppercase[i]
 			cell = ws[c + str(j)]
+			# cell = ws.cell(row=j, column=i+1)
 			if val == cell.value:
 				loc = (c, j)
-				print('loc of {} = {}'.format(val, loc))
+				# loc = (i, j)
+				# print('loc of {} = {}'.format(val, loc))
 				return loc

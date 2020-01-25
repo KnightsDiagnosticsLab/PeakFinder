@@ -7,10 +7,10 @@ import pandas as pd
 import easygui
 import openpyxl
 from openpyxl.styles import Border, Side, PatternFill, Font, GradientFill, Alignment
-from string import ascii_uppercase
 import win32com.client as win32
 import csv
-from fsa import use_csv_module, fix_formatting, location_of_value
+from fsa import use_csv_module, fix_formatting, location_of_value, get_col_to_drop, convert_xls_to_xlsx
+import random
 pd.set_option('display.max_columns', 20)
 
 def build_results_dict(df=None):
@@ -42,21 +42,12 @@ def build_results_dict(df=None):
 	return peaks
 
 
-def get_col_to_drop(df):
-	col_to_drop = []
-	for col in df.columns:
-		if 'Unnamed' in str(col) and df[col].isnull().all():
-			col_to_drop.append(col)
-	return col_to_drop
-
-
-def build_profile_2(res, sample_name, template_path):
+def build_profile_2(template_path, sample_name='', res={}):
+	# print('Now running build_profile_2')
 	file_name = str(sample_name)
 
-	# df = pd.read_excel(template_path)
 	wb = openpyxl.load_workbook(template_path)
 	ws = wb.worksheets[0]
-	# df = pd.read_excel(template_path)
 	df = pd.DataFrame(ws.values)
 
 	replacement_dict = {
@@ -65,12 +56,13 @@ def build_profile_2(res, sample_name, template_path):
 		'amelogenin': 'AMEL',
 		'AMELOGENIN': 'AMEL',
 		'Recipient (Host) Alleles': 'Host',
-		'VWA': 'vWA',
-		'vwa': 'vWA',
-		'vWa': 'vWA',
-		'VWa': 'vWA',
-		'VwA': 'vWA',
+		# 'VWA': 'vWA',
+		# 'vwa': 'vWA',
+		# 'vWa': 'vWA',
+		# 'VWa': 'vWA',
+		# 'VwA': 'vWA',
 	}
+	df.replace(to_replace='[vV][wW][aA]', value='vWA', regex=True, inplace=True)
 	df.replace(to_replace=replacement_dict, inplace=True)
 	col_to_drop = get_col_to_drop(df)
 	df.drop(axis=1, columns=col_to_drop, inplace=True)
@@ -106,14 +98,11 @@ def build_profile_2(res, sample_name, template_path):
 			# 	df.iat[i + 1, j + k] = pd.np.nan
 
 	'''	Insert case number near top '''
-	# case_name = re.sub(r'_PTE.*$', '', sample_name)
-	# loc = location_of_value(ws, 'Post-T:')
-	# if loc is not None:
-	# 	c = ord(loc[0])-96
-	# 	coor = (c+1, loc[1])
-	# 	print(loc, coor)
-	# 	df.iat[coor[1]+1, coor[0]] = case_name
-
+	case_name = re.sub(r'_PTE.*$', '', sample_name)
+	loc = location_of_value(ws, 'Post-T:')
+	if loc is not None:
+		cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
+		cell.value = case_name
 
 	'''	Get rid of the remaining 'Unnamed: #' column labels '''
 	df.rename(columns=lambda x: re.sub(r'Unnamed.*', '', str(x)), inplace=True)
@@ -160,6 +149,7 @@ def build_profile_1(res):
 			'vWa': 'vWA',
 			'VWa': 'vWA',
 			'VwA': 'vWA',
+			'Vwa':'vWA'
 		}
 		df.replace(to_replace=replacement_dict, inplace=True)
 		col_to_drop = get_col_to_drop(df)
@@ -215,35 +205,14 @@ def get_header(template):
 	elif template.endswith('.xls') and os.path.isfile(template + 'x'):
 		template = template + 'x'
 	else:
-		excel = win32.gencache.EnsureDispatch('Excel.Application')
-		wb = excel.Workbooks.Open(template)
-
-		template = template + 'x'
-		# FileFormat = 51 is for .xlsx extension
-		wb.SaveAs(template, FileFormat=51)
-		wb.Close()  # FileFormat = 56 is for .xls extension
-		excel.Application.Quit()
+		template = convert_xls_to_xlsx(template)
 	assert template.endswith('.xlsx')
 
 	wb = openpyxl.load_workbook(template)
 	ws = wb.worksheets[0]
 	header = ws.oddHeader
+	wb.close()
 	return header
-
-
-def convert_xls_to_xlsx(file_path):
-	if file_path.endswith('.xls'):
-		excel = win32.gencache.EnsureDispatch('Excel.Application')
-		wb = excel.Workbooks.Open(file_path)
-
-		new_file_path = file_path + 'x'
-		# FileFormat = 51 is for .xlsx extension
-		# excel.ActiveWorkbook.SaveAs(new_file_path, FileFormat=51)
-		wb.SaveAs(new_file_path, FileFormat=51)
-		wb.Close()  # FileFormat = 56 is for .xls extension
-		# excel.Workbooks(1).Close(0)
-		# excel.Application.Quit()
-	return new_file_path
 
 def insert_formulae(filename, template):
 	if template.endswith('.xls'):
@@ -285,6 +254,7 @@ def insert_formulae(filename, template):
 		# print(cell1.value, cell2.value)
 		# print('')
 	wb.save(filename)
+	wb.close()
 
 
 def main():

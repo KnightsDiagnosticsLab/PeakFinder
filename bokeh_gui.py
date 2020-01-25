@@ -10,25 +10,32 @@ from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askdirectory, asksaveasfilename
 
 import pandas as pd
-from fsa import use_csv_module, fix_formatting
+from fsa import use_csv_module, fix_formatting, get_col_to_drop, convert_xls_to_xlsx
 import copy
 import openpyxl
 from openpyxl.styles import Alignment
-from extract_from_genemapper import build_results_dict, build_profile_2, get_header, convert_xls_to_xlsx
+from extract_from_genemapper import build_results_dict, build_profile_2, get_header
 import re
 
 pd.set_option('display.max_columns', 20)
-
+pd.set_option('display.width', 1000)
+pd.set_option('display.max_rows', 50)
 
 def reduce_rows(df):
-	df.dropna(axis=1, how='all', inplace=True)
+	# print(df)
+	df = df.dropna(axis=1, how='all')
 	cols = ['Sample File Name', 'Marker','Allele', 'Area']
-	df.dropna(axis=0, how='any', subset=cols, inplace=True)
-	df.sort_values(by=cols, ascending=True, inplace=True)
-	df = df.astype({'Area':'int',
-					'Size':'float',
-					'Height':'int',
-					'Data Point':'int'})
+	df = df.dropna(axis=0, how='any', subset=cols)
+	df = df.sort_values(by=cols, ascending=True)
+	# print('********************************************')
+	# print(df)
+	type_dict = {'Area':'int',
+				'Size':'float',
+				'Height':'int',
+				'Data Point':'int'}
+	for key, val in type_dict.items():
+		if key in df.columns.tolist():
+			df = df.astype({key:val})
 	return df
 
 
@@ -40,7 +47,9 @@ def on_donor_change(attrname, old, new):
 		p0_current_case = newest[0]
 		allele_table_p0c1.source.data = source_cases[newest[0]].data
 		allele_table_p0c1.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+		refresh_template_preview_table()
 
+def refresh_template_preview_table():
 		''' Preview Template '''
 		wb = make_template_wb()
 		ws = wb.worksheets[0]
@@ -49,7 +58,7 @@ def on_donor_change(attrname, old, new):
 		# df.loc[-1] = df.columns.tolist()
 		df.index = df.index + 1
 		df.sort_index(inplace=True)
-		col_letters = [openpyxl.utils.get_column_letter(i+1) for i in df.columns.tolist()]
+		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df.columns.tolist()]
 		df.columns = col_letters
 		df = df.fillna('')
 		df_col = df.columns.tolist()
@@ -164,8 +173,9 @@ def make_template_wb(file_path=None):
 	ws.cell(row=2, column=2, value='Host')
 	ws.cell(row=1, column=2, value=host_case)
 	for i, donor_case in enumerate(donor_cases):
+		case_name = re.sub(r'_PTE.*$', '', donor_case)
 		c = 4 + 2*i
-		ws.cell(row=1, column=c, value=donor_case)
+		ws.cell(row=1, column=c, value=case_name)
 		if len(donor_cases) == 1:
 			donor_num = 'Donor'
 		else:
@@ -400,6 +410,7 @@ def make_template_wb(file_path=None):
 	percent_donor_avg = ws.cell(row=4+2*len(markers), column=percent_host_col)
 	percent_donor_avg.value = '=100-{}'.format(percent_host_avg.coordinate)
 
+
 	if file_path is not None:
 		if file_path.endswith('.xlsx'):
 			'''	Save the file before running fix_formatting '''
@@ -409,6 +420,8 @@ def make_template_wb(file_path=None):
 			'''	Fix formatting '''
 			fix_formatting(file_path)
 			print('Done saving {}'.format(file_path))
+
+	wb.close()
 
 	return wb
 
@@ -422,7 +435,6 @@ def on_export_template_click():
 									title = 'Save Template',
 									initialfile=enter_host_name.value)
 	root.destroy()
-	# print('******** file_path = {} '.format(file_path))
 	if file_path.endswith('.xlsx'):
 		make_template_wb(file_path)
 
@@ -434,6 +446,7 @@ def on_select_alleles_change(attrname, old, new):
 	source_cases[p0_current_case].selected.indices = indices[:]
 	df_cases[p0_current_case].loc[:,'Selected'] = False
 	df_cases[p0_current_case].loc[indices,'Selected'] = True
+	refresh_template_preview_table()
 
 
 def on_select_template_click():
@@ -442,7 +455,7 @@ def on_select_template_click():
 	root.withdraw()		# hide the root tk window
 	file_path = askopenfilename(filetypes=[
 											('Excel', '*.xlsx'),
-											# ('Excel', '*.xls'),
+											('Excel', '*.xls'),
 										],
 								title = 'Choose Template',
 								initialdir=r'X:\Hospital\Genetics Lab\DNA_Lab\3-Oncology Tests\Engraftment\Allele Charts')
@@ -451,33 +464,50 @@ def on_select_template_click():
 	''' Convert xls to xlsx if needed '''
 	if file_path.endswith('.xls'):
 		file_path = convert_xls_to_xlsx(file_path)
+	if file_path is not None:
+	# drop_empty_columns_and_adjust_formulae(file_path)
+		''' Update template_text box'''
+		template_text.value = basename(file_path)
+		global template_path
+		template_path = file_path
+		df = build_profile_2(template_path=template_path)
+		# wb = openpyxl.load_workbook(file_path)
+		# ws = wb.worksheets[0]
+		# df = pd.DataFrame(ws.values)
+		# wb.close()
+		# col_to_drop = get_col_to_drop(df)
+		# df.drop(axis=1, columns=col_to_drop, inplace=True)
+		# print(df)
+		df.loc[-1] = ''
+		# print('doing the whole template thing')
+		# df.loc[-1] = df.columns.tolist()
+		df.index = df.index + 1
+		df.sort_index(inplace=True)
+		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df.columns.tolist()]
+		df.columns = col_letters
+		df = df.fillna('')
+		df_col = df.columns.tolist()
+		columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+		template_table_p1c1.columns = columns
+		template_table_p1c1.source.data = ColumnDataSource(df).data
 
-	'''	Need to deal with allele cells that equal other cells '''
+def redo_formulae():
+	pass
 
 
-	''' Update template_text box'''
-	template_text.value = basename(file_path)
-	global template_path
-	template_path = file_path
-	wb = openpyxl.load_workbook(file_path)
-	ws = wb.worksheets[0]
-	# df = pd.read_excel(template_path)
-	df = pd.DataFrame(ws.values)
-	wb.close()
-	# print(df)
-	df.loc[-1] = ''
-	# df.loc[-1] = df.columns.tolist()
-	df.index = df.index + 1
-	df.sort_index(inplace=True)
-	col_letters = [openpyxl.utils.get_column_letter(i+1) for i in df.columns.tolist()]
-	df.columns = col_letters
-	df = df.fillna('')
-	df_col = df.columns.tolist()
-	columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
-	columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-	template_table_p1c1.columns = columns
-	template_table_p1c1.source.data = ColumnDataSource(df).data
+# def drop_empty_columns_and_adjust_formulae(file_path):
+# 	wb = openpyxl.load_workbook(file_path)
+# 	ws = wb.worksheets[0]
+# 	max_col = ws.max_column
+# 	max_row = ws.max_row
+# 	col_range = range(1,ws.max_column+1)
+# 	'''	Compile list of empty columns '''
+# 	empty_cols = []
+# 	for c in col_range:
 
+# 	wb.save(file_path)
+# 	wb.close()
 
 def on_export_results_click():
 	global template_path
@@ -501,7 +531,7 @@ def on_export_results_click():
 		# print(df)
 		results = build_results_dict(df)
 		# print(results)
-		df_filled = build_profile_2(results, sample, template_path)
+		df_filled = build_profile_2(res=results, sample_name=sample, template_path=template_path)
 		# print(df_filled)
 
 		# col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
@@ -521,7 +551,10 @@ def on_select_samples_change(attrname, old, new):
 		# print(df)
 		results = build_results_dict(df)
 		# print(results)
-		df_filled = build_profile_2(results, panel1_current_case, template_path)
+		df_filled = build_profile_2(res=results, sample_name=panel1_current_case, template_path=template_path)
+		df_filled.loc[-1] = ''
+		df_filled.index = df.index + 1
+		df_filled.sort_index(inplace=True)
 
 		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
 		df_filled.columns = col_letters
