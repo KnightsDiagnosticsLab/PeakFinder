@@ -17,9 +17,23 @@ from openpyxl.styles import Alignment
 from extract_from_genemapper import build_results_dict, build_profile_2, get_header
 import re
 
+from pprint import pprint
+
 pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 50)
+
+global_dict = {
+	'template_path': None,
+	'p0_template_path': None,
+	'p1_template_path': None,
+	'p0_host': None,
+	'p0_donors': [],
+	'p1_current_case': None,
+	'p1_host': None,
+	'p1_donors':[],
+}
+
 
 def reduce_rows(df):
 	# print(df)
@@ -47,7 +61,7 @@ def on_donor_change(attrname, old, new):
 		p0_current_case = newest[0]
 		allele_table_p0c1.source.data = source_cases[newest[0]].data
 		allele_table_p0c1.source.selected.indices = source_cases[newest[0]].selected.indices[:]
-		refresh_template_preview_table()
+	refresh_template_preview_table()
 
 def refresh_template_preview_table():
 		''' Preview Template '''
@@ -155,6 +169,8 @@ def make_template_wb(file_path=None):
 	host_case = select_host_case.value
 	df_host = df_cases[host_case]
 	df_host = df_host.loc[df_host['Selected'] == True]
+	print('df_host')
+	print(df_host)
 
 	donor_cases = select_donor_cases.value
 	donors = {}
@@ -461,16 +477,19 @@ def on_select_template_click():
 								initialdir=r'X:\Hospital\Genetics Lab\DNA_Lab\3-Oncology Tests\Engraftment\Allele Charts')
 	root.destroy()
 
+	# print('file_path = {}'.format(file_path))
+
 	''' Convert xls to xlsx if needed '''
 	if file_path.endswith('.xls'):
 		file_path = convert_xls_to_xlsx(file_path)
-	if file_path is not None:
+	if file_path is not None and file_path != '':
 	# drop_empty_columns_and_adjust_formulae(file_path)
 		''' Update template_text box'''
 		template_text.value = basename(file_path)
-		global template_path
-		template_path = file_path
-		df = build_profile_2(template_path=template_path)
+		global_dict['template_path'] = file_path
+		# global template_path
+		# template_path = file_path
+		df = build_profile_2(template=global_dict['template_path'])
 		# wb = openpyxl.load_workbook(file_path)
 		# ws = wb.worksheets[0]
 		# df = pd.DataFrame(ws.values)
@@ -478,19 +497,20 @@ def on_select_template_click():
 		# col_to_drop = get_col_to_drop(df)
 		# df.drop(axis=1, columns=col_to_drop, inplace=True)
 		# print(df)
-		df.loc[-1] = ''
-		# print('doing the whole template thing')
-		# df.loc[-1] = df.columns.tolist()
-		df.index = df.index + 1
-		df.sort_index(inplace=True)
-		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df.columns.tolist()]
-		df.columns = col_letters
-		df = df.fillna('')
-		df_col = df.columns.tolist()
-		columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
-		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-		template_table_p1c1.columns = columns
-		template_table_p1c1.source.data = ColumnDataSource(df).data
+		if not df.empty:
+			df.loc[-1] = ''
+			# print('doing the whole template thing')
+			# df.loc[-1] = df.columns.tolist()
+			df.index = df.index + 1
+			df.sort_index(inplace=True)
+			col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df.columns.tolist()]
+			df.columns = col_letters
+			df = df.fillna('')
+			df_col = df.columns.tolist()
+			columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+			columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+			template_table_p1c1.columns = columns
+			template_table_p1c1.source.data = ColumnDataSource(df).data
 
 def redo_formulae():
 	pass
@@ -510,7 +530,8 @@ def redo_formulae():
 # 	wb.close()
 
 def on_export_results_click():
-	global template_path
+	# global template_path
+	template_path = global_dict['template_path']
 
 	header = get_header(template_path)
 	patient_name = header.center.text
@@ -531,7 +552,7 @@ def on_export_results_click():
 		# print(df)
 		results = build_results_dict(df)
 		# print(results)
-		df_filled = build_profile_2(res=results, sample_name=sample, template_path=template_path)
+		df_filled = build_profile_2(res=results, sample_name=sample, template=template_path)
 		# print(df_filled)
 
 		# col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
@@ -542,28 +563,35 @@ def on_export_results_click():
 
 
 def on_select_samples_change(attrname, old, new):
-	global panel1_current_case, template_path
+	# global p1_current_case
+
+	template_path = global_dict['template_path']
 
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
-		panel1_current_case = newest[0]
-		df = df_cases[panel1_current_case]
+		global_dict['p1_current_case'] = newest[0]
+		p1_current_case = global_dict['p1_current_case']
+		df = df_cases[p1_current_case]
 		# print(df)
 		results = build_results_dict(df)
-		# print(results)
-		df_filled = build_profile_2(res=results, sample_name=panel1_current_case, template_path=template_path)
-		df_filled.loc[-1] = ''
-		df_filled.index = df.index + 1
-		df_filled.sort_index(inplace=True)
+		# pprint(results)
+		df_filled = build_profile_2(res=results, sample_name=global_dict['p1_current_case'], template=global_dict['template_path'])
+		if not df_filled.empty:
+			# print(df_filled)
+			df_filled.loc[-1] = ''
+			# print(df_filled)
+			# print(df_filled.index.tolist())
+			df_filled.index = df_filled.index + 1
+			df_filled.sort_index(inplace=True)
 
-		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
-		df_filled.columns = col_letters
-		df_filled = df_filled.fillna('')
-		df_col = df_filled.columns.tolist()
-		columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
-		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-		template_table_p1c1.columns = columns
-		template_table_p1c1.source.data = ColumnDataSource(df_filled).data
+			col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
+			df_filled.columns = col_letters
+			df_filled = df_filled.fillna('')
+			df_col = df_filled.columns.tolist()
+			columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+			columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+			template_table_p1c1.columns = columns
+			template_table_p1c1.source.data = ColumnDataSource(df_filled).data
 
 
 results_files = []

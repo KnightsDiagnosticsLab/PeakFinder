@@ -4,7 +4,7 @@ import openpyxl
 from openpyxl.styles import Border, Side, PatternFill, Font, GradientFill, Alignment
 from string import ascii_uppercase
 import random
-
+import re
 import win32com.client as win32
 import easygui
 
@@ -154,16 +154,46 @@ def fix_formatting(filename, header=None, case_name=None):
 	wb.save(filename)
 	wb.close()  # FileFormat = 56 is for .xls extension
 
+def replace_cell_values(ws, replacement_dict, regex=False):
+	for r in range(1, ws.max_row + 1):
+		for c in range(1, ws.max_column + 1):
+			cell = ws.cell(row=r, column=c)
+			for old, new in replacement_dict.items():
+				if regex:
+					if re.fullmatch(old, str(cell.value), flags=re.IGNORECASE) is not None:
+						cell.value = new
+				elif cell.value == old:
+					cell.value = new
+	return ws
+
+
+def locations_of_value(ws, val):
+	locs = []
+	for r in range(1, ws.max_row + 1):
+		for c in range(1, ws.max_column + 1):
+			cell = ws.cell(row=r, column=c)
+			if val == cell.value:
+				locs.append(cell.coordinate)
+	return locs
 
 def location_of_value(ws, val):
 	loc = None
-	for j in range(1, ws.max_row + 1):
-		for i in range(1, ws.max_column + 1):
-			c = ascii_uppercase[i]
-			cell = ws[c + str(j)]
-			# cell = ws.cell(row=j, column=i+1)
+	# print('\t************ ws.max_column = {}'.format(ws.max_column))
+	# print('\t************ ws.max_row = {}'.format(ws.max_row))
+	for r in range(1, ws.max_row + 1):
+		for c in range(1, ws.max_column + 1):
+			# c = ascii_uppercase[i]
+			# cell = ws[c + str(j)]
+			cell = ws.cell(row=r, column=c)
+			# print('c = {}'.format(c))
+			# print('c+1 = {}'.format(c))
+			# print('cell.coordinate = {}'.format(cell.coordinate))
 			if val == cell.value:
-				loc = (c, j)
+				loc = cell.coordinate
+				# print('\t\t******** {}'.format(loc))
+				# loc = (c, j)
+				# print('\t\t******** {}'.format(loc))
 				# loc = (i, j)
 				# print('loc of {} = {}'.format(val, loc))
 				return loc
+	return loc
