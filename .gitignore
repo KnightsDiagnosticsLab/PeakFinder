@@ -2,6 +2,6 @@
 *.toc
 *.pkg
 *.pyz
-build/extract_from_genemapper/warn-extract_from_genemapper.txt
 *.spec
 *.json
+.vscode/settings.json
