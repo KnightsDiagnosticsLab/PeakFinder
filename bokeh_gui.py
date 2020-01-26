@@ -1,6 +1,6 @@
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, gridplot
-from bokeh.models.widgets import FileInput, DataTable, DateFormatter, TableColumn, RadioButtonGroup, RadioGroup, Select, TextAreaInput, MultiSelect
+from bokeh.models.widgets import FileInput, DataTable, DateFormatter, TableColumn, RadioButtonGroup, RadioGroup, Select, TextAreaInput, MultiSelect, Div
 from bokeh.models import TextInput, Button, ColumnDataSource, CDSView, IndexFilter, Panel, Tabs
 from convert_fsa_to_csv import convert_file, convert_file_content
 from os.path import basename
@@ -29,6 +29,7 @@ global_dict = {
 	'p1_template_path': None,
 	'p0_host': None,
 	'p0_donors': [],
+	'p0_current_case': None,
 	'p1_current_case': None,
 	'p1_host': None,
 	'p1_donors':[],
@@ -54,14 +55,17 @@ def reduce_rows(df):
 
 
 def on_donor_change(attrname, old, new):
-	global allele_table_p0c1, p0_current_case
+	global p0c1_allele_table
 
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
-		p0_current_case = newest[0]
-		allele_table_p0c1.source.data = source_cases[newest[0]].data
-		allele_table_p0c1.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+		global_dict['p0_current_case'] = newest[0]
+
+		p0c1_table_title.text = str(global_dict['p0_current_case'])
+		p0c1_allele_table.source.data = source_cases[newest[0]].data
+		p0c1_allele_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
 	refresh_template_preview_table()
+
 
 def refresh_template_preview_table():
 		''' Preview Template '''
@@ -76,22 +80,24 @@ def refresh_template_preview_table():
 		df.columns = col_letters
 		df = df.fillna('')
 		df_col = df.columns.tolist()
-		columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+		columns = [TableColumn(field=col, title=col, width=75) for col in df_col[0]]
+		columns.extend([TableColumn(field=col, title=col, width=50) for col in df_col[1:-2]])
 		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-		template_table_p0c2.columns = columns
-		template_table_p0c2.source.data = ColumnDataSource(df).data
+		p0c2_template_table.columns = columns
+		p0c2_template_table.source.data = ColumnDataSource(df).data
 
 
 def on_host_click(attrname, old, new):
-	global source_cases, allele_table_p0c1, p0_current_case
+	global source_cases, p0c1_allele_table
 
-	p0_current_case = new
-	allele_table_p0c1.source.data = source_cases[new].data
-	allele_table_p0c1.source.selected.indices = source_cases[new].selected.indices[:]
+	global_dict['p0_current_case'] = new
+	p0c1_table_title.text = str(global_dict['p0_current_case'])
+	p0c1_allele_table.source.data = source_cases[new].data
+	p0c1_allele_table.source.selected.indices = source_cases[new].selected.indices[:]
 
 
 def on_results_click():
-	global source_cases, results_files, df, allele_table_p0c1, df_cases
+	global source_cases, results_files, df, p0c1_allele_table, df_cases
 
 	root = tk.Tk()
 	root.attributes("-topmost", True)
@@ -169,8 +175,8 @@ def make_template_wb(file_path=None):
 	host_case = select_host_case.value
 	df_host = df_cases[host_case]
 	df_host = df_host.loc[df_host['Selected'] == True]
-	print('df_host')
-	print(df_host)
+	# print('df_host')
+	# print(df_host)
 
 	donor_cases = select_donor_cases.value
 	donors = {}
@@ -187,11 +193,12 @@ def make_template_wb(file_path=None):
 	# ws.oddHeader.center.size = 14
 	ws.cell(row=2, column=1, value='Marker')
 	ws.cell(row=2, column=2, value='Host')
-	ws.cell(row=1, column=2, value=host_case)
+	host_case_abbrev = re.sub(r'_PTE.*$', '', host_case)
+	ws.cell(row=1, column=2, value=host_case_abbrev)
 	for i, donor_case in enumerate(donor_cases):
-		case_name = re.sub(r'_PTE.*$', '', donor_case)
+		donor_case_abbrev = re.sub(r'_PTE.*$', '', donor_case)
 		c = 4 + 2*i
-		ws.cell(row=1, column=c, value=case_name)
+		ws.cell(row=1, column=c, value=donor_case_abbrev)
 		if len(donor_cases) == 1:
 			donor_num = 'Donor'
 		else:
@@ -244,187 +251,190 @@ def make_template_wb(file_path=None):
 	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Host')
 	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Donor')
 
-	'''	Add the actual formulae. For now only if there's one donor, because
-		I haven't been given a cheatsheet for 2+ donors.
-	'''
-	percent_host_col = 2*caa - 1		# col num where formula goes. Actual Excel formula, not the text version.
-	d1_col = percent_host_col - 4		# col num for donor allele 1
-	d2_col = percent_host_col - 3		# col num for donor allele 2
-	h1_col = percent_host_col - 2		# col num for host allele 1
-	h2_col = percent_host_col - 1		# col num for host allele 2
-	for r2 in range(4, 4+2*len(markers), 2):
-		r1 = r2 - 1
 
-		d1_alle = ws.cell(row=r1, column=d1_col)
-		d2_alle = ws.cell(row=r1, column=d2_col)
-		h1_alle = ws.cell(row=r1, column=h1_col)
-		h2_alle = ws.cell(row=r1, column=h2_col)
+	if len(donor_cases) == 1:
 
-		d1_alle_val = format_value(d1_alle.value)
-		d2_alle_val = format_value(d2_alle.value)
-		h1_alle_val = format_value(h1_alle.value)
-		h2_alle_val = format_value(h2_alle.value)
+		'''	Add the actual formulae. For now only if there's one donor, because
+			I haven't been given a cheatsheet for 2+ donors.
+		'''
+		percent_host_col = 2*caa - 1		# col num where formula goes. Actual Excel formula, not the text version.
+		d1_col = percent_host_col - 4		# col num for donor allele 1
+		d2_col = percent_host_col - 3		# col num for donor allele 2
+		h1_col = percent_host_col - 2		# col num for host allele 1
+		h2_col = percent_host_col - 1		# col num for host allele 2
+		for r2 in range(4, 4+2*len(markers), 2):
+			r1 = r2 - 1
 
-		d1_area = ws.cell(row=r2, column=d1_col)
-		d2_area = ws.cell(row=r2, column=d2_col)
-		h1_area = ws.cell(row=r2, column=h1_col)
-		h2_area = ws.cell(row=r2, column=h2_col)
+			d1_alle = ws.cell(row=r1, column=d1_col)
+			d2_alle = ws.cell(row=r1, column=d2_col)
+			h1_alle = ws.cell(row=r1, column=h1_col)
+			h2_alle = ws.cell(row=r1, column=h2_col)
 
-		f1 = ws.cell(row=r1, column=percent_host_col+1)
-		f1.alignment = Alignment(horizontal='center')
-		f2 = ws.cell(row=r2, column=percent_host_col+1)
-		f2.alignment = Alignment(horizontal='left')
+			d1_alle_val = format_value(d1_alle.value)
+			d2_alle_val = format_value(d2_alle.value)
+			h1_alle_val = format_value(h1_alle.value)
+			h2_alle_val = format_value(h2_alle.value)
 
-		d = {d1_alle_val, d2_alle_val}
-		d.discard(None)
-		h = {h1_alle_val, h2_alle_val}
-		h.discard(None)
+			d1_area = ws.cell(row=r2, column=d1_col)
+			d2_area = ws.cell(row=r2, column=d2_col)
+			h1_area = ws.cell(row=r2, column=h1_col)
+			h2_area = ws.cell(row=r2, column=h2_col)
 
-		percent_host = ws.cell(row=r2, column=percent_host_col)
-
-		# print('d = {}, h = {}'.format(d,h))
-
-		if len(d | h) == 4:
-			f1.value = '{} + {}'.format(h1_alle_val,
-										h2_alle_val)
+			f1 = ws.cell(row=r1, column=percent_host_col+1)
 			f1.alignment = Alignment(horizontal='center')
+			f2 = ws.cell(row=r2, column=percent_host_col+1)
+			f2.alignment = Alignment(horizontal='left')
 
-			f2.value = '{} + {} + {} + {}'.format(h1_alle_val,
-													h2_alle_val,
-													d1_alle_val,
-													d2_alle_val)
+			d = {d1_alle_val, d2_alle_val}
+			d.discard(None)
+			h = {h1_alle_val, h2_alle_val}
+			h.discard(None)
 
-			percent_host.value = '=100*SUM({}:{})/SUM({},{},{},{})'.format(h1_area.coordinate,
-																h2_area.coordinate,
-																d1_area.coordinate,
-																d2_area.coordinate,
-																h1_area.coordinate,
-																h2_area.coordinate)
+			percent_host = ws.cell(row=r2, column=percent_host_col)
 
-		if len(h) == 1 and len(h | d) == 3:
-			f1.value = '{}'.format(h1_alle_val)
-			f1.alignment = Alignment(horizontal='center')
+			# print('d = {}, h = {}'.format(d,h))
 
-			f2.value = '{} + {} + {}'.format(h1_alle_val,
-											d1_alle_val,
-											d2_alle_val)
+			if len(d | h) == 4:
+				f1.value = '{} + {}'.format(h1_alle_val,
+											h2_alle_val)
+				f1.alignment = Alignment(horizontal='center')
 
-			percent_host.value = '=100*{}/SUM({},{},{})'.format(h1_area.coordinate,
-														d1_area.coordinate,
-														d2_area.coordinate,
-														h1_area.coordinate)
+				f2.value = '{} + {} + {} + {}'.format(h1_alle_val,
+														h2_alle_val,
+														d1_alle_val,
+														d2_alle_val)
 
-		if len(d) == 1 and len( h | d) == 3:
-			f1.value = '{} + {}'.format(h1_alle_val,
-										h2_alle_val)
-			f1.alignment = Alignment(horizontal='center')
+				percent_host.value = '=100*SUM({}:{})/SUM({},{},{},{})'.format(h1_area.coordinate,
+																	h2_area.coordinate,
+																	d1_area.coordinate,
+																	d2_area.coordinate,
+																	h1_area.coordinate,
+																	h2_area.coordinate)
 
-			f2.value = '{} + {} + {}'.format(h1_alle_val,
-											h2_alle_val,
+			if len(h) == 1 and len(h | d) == 3:
+				f1.value = '{}'.format(h1_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {} + {}'.format(h1_alle_val,
+												d1_alle_val,
+												d2_alle_val)
+
+				percent_host.value = '=100*{}/SUM({},{},{})'.format(h1_area.coordinate,
+															d1_area.coordinate,
+															d2_area.coordinate,
+															h1_area.coordinate)
+
+			if len(d) == 1 and len( h | d) == 3:
+				f1.value = '{} + {}'.format(h1_alle_val,
+											h2_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {} + {}'.format(h1_alle_val,
+												h2_alle_val,
+												d1_alle_val)
+
+				percent_host.value = '=100*SUM({}:{})/SUM({},{},{})'.format(h1_area.coordinate,
+																	h2_area.coordinate,
+																	d1_area.coordinate,
+																	h1_area.coordinate,
+																	h2_area.coordinate)
+
+			if len(h) == 1 and len(d) == 1 and len(h | d) == 2:
+				f1.value = '{}'.format(h1_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {}'.format(h1_alle_val,
 											d1_alle_val)
+				f2.alignment = Alignment(horizontal='center')
 
-			percent_host.value = '=100*SUM({}:{})/SUM({},{},{})'.format(h1_area.coordinate,
-																h2_area.coordinate,
-																d1_area.coordinate,
-																h1_area.coordinate,
-																h2_area.coordinate)
+				percent_host = '={}/SUM({},{})'.format(h1_area.coordinate,
+													d1_area.coordinate,
+													h1_area.coordinate)
 
-		if len(h) == 1 and len(d) == 1 and len(h | d) == 2:
-			f1.value = '{}'.format(h1_alle_val)
-			f1.alignment = Alignment(horizontal='center')
+			if len(h) == 2 and len(d) == 2 and len(h | d) == 3:
+				if h1_alle_val not in d:
+					h_unique_alle_val = h1_alle_val
+					h_unique_area = h1_area
+				else:
+					h_unique_alle_val = h2_alle_val
+					h_unique_area = h2_area
 
-			f2.value = '{} + {}'.format(h1_alle_val,
-										d1_alle_val)
-			f2.alignment = Alignment(horizontal='center')
+				if d1_alle_val not in h:
+					d_unique_alle_val = d1_alle_val
+					d_unique_area = d1_area
+				else:
+					d_unique_alle_val = d2_alle_val
+					d_unique_area = d2_area
 
-			percent_host = '={}/SUM({},{})'.format(h1_area.coordinate,
-												d1_area.coordinate,
-												h1_area.coordinate)
+				f1.value = '{}'.format(h_unique_alle_val)
+				f1.alignment = Alignment(horizontal='center')
 
-		if len(h) == 2 and len(d) == 2 and len(h | d) == 3:
-			if h1_alle_val not in d:
-				h_unique_alle_val = h1_alle_val
-				h_unique_area = h1_area
-			else:
-				h_unique_alle_val = h2_alle_val
-				h_unique_area = h2_area
+				f2.value = '{} + {}'.format(h_unique_alle_val,
+											d_unique_alle_val)
+				f2.alignment = Alignment(horizontal='center')
 
-			if d1_alle_val not in h:
-				d_unique_alle_val = d1_alle_val
-				d_unique_area = d1_area
-			else:
-				d_unique_alle_val = d2_alle_val
-				d_unique_area = d2_area
+				percent_host.value = '=100*{}/SUM({},{})'.format(h_unique_area.coordinate,
+													d_unique_area.coordinate,
+													h_unique_area.coordinate)
 
-			f1.value = '{}'.format(h_unique_alle_val)
-			f1.alignment = Alignment(horizontal='center')
+			if len(h) == 1 and len(d) == 2 and len(h | d) == 2:
+				if d1_alle_val in h:
+					A_alle_val = d2_alle_val
+					A_area = d2_area
+				else:
+					A_alle_val = d1_alle_val
+					A_area = d1_area
 
-			f2.value = '{} + {}'.format(h_unique_alle_val,
-										d_unique_alle_val)
-			f2.alignment = Alignment(horizontal='center')
+				if h1_alle_val in d:
+					H_alle_val = h1_alle_val
+					H_area = h1_area
+				else:
+					H_alle_val = h2_alle_val
+					H_area = h2_area
 
-			percent_host.value = '=100*{}/SUM({},{})'.format(h_unique_area.coordinate,
-												d_unique_area.coordinate,
-												h_unique_area.coordinate)
+				f2.value = '1 - (2x{}/({} + {}))'.format(A_alle_val,
+														A_alle_val,
+														H_alle_val)
 
-		if len(h) == 1 and len(d) == 2 and len(h | d) == 2:
-			if d1_alle_val in h:
-				A_alle_val = d2_alle_val
-				A_area = d2_area
-			else:
-				A_alle_val = d1_alle_val
-				A_area = d1_area
+				percent_host.value = '=100*(1-(2*{}/({}+{})))'.format(A_area.coordinate,
+																	A_area.coordinate,
+																	H_area.coordinate)
+			
+			if len(h) == 2 and len(d) == 1 and len(h | d) == 2:
+				if h1_alle_val in d:
+					A_alle_val = h2_alle_val
+					A_area = h2_area
+				else:
+					A_alle_val = h1_alle_val
+					A_area = h1_area
 
-			if h1_alle_val in d:
-				H_alle_val = h1_alle_val
-				H_area = h1_area
-			else:
-				H_alle_val = h2_alle_val
-				H_area = h2_area
+				if d1_alle_val in h:
+					D_alle_val = d1_alle_val
+					D_area = d1_area
+				else:
+					D_alle_val = d2_alle_val
+					D_area = d2_area
 
-			f2.value = '1 - (2x{}/({} + {}))'.format(A_alle_val,
-													A_alle_val,
-													H_alle_val)
+				f1.value = '2x{}'.format(A_alle_val)
+				f1.alignment = Alignment(horizontal='center')
 
-			percent_host.value = '=100*(1-(2*{}/({}+{})))'.format(A_area.coordinate,
-																A_area.coordinate,
-																H_area.coordinate)
-		
-		if len(h) == 2 and len(d) == 1 and len(h | d) == 2:
-			if h1_alle_val in d:
-				A_alle_val = h2_alle_val
-				A_area = h2_area
-			else:
-				A_alle_val = h1_alle_val
-				A_area = h1_area
+				f2.value = '{} + {}'.format(A_alle_val,
+											D_alle_val)
+				f2.alignment = Alignment(horizontal='center')
 
-			if d1_alle_val in h:
-				D_alle_val = d1_alle_val
-				D_area = d1_area
-			else:
-				D_alle_val = d2_alle_val
-				D_area = d2_area
+				percent_host.value = '=100*(2*{})/({}+{})'.format(A_area.coordinate,
+																	A_area.coordinate,
+																	D_area.coordinate)
 
-			f1.value = '2x{}'.format(A_alle_val)
-			f1.alignment = Alignment(horizontal='center')
+		'''	Formula for average of Percent Host column
+		'''
+		percent_host_avg = ws.cell(row=3+2*len(markers), column=percent_host_col)
+		start = ws.cell(row=3, column=percent_host_col)
+		end = ws.cell(row=2+2*len(markers), column=percent_host_col)
+		percent_host_avg.value = '=AVERAGE({}:{})'.format(start.coordinate, end.coordinate)
 
-			f2.value = '{} + {}'.format(A_alle_val,
-										D_alle_val)
-			f2.alignment = Alignment(horizontal='center')
-
-			percent_host.value = '=100*(2*{})/({}+{})'.format(A_area.coordinate,
-																A_area.coordinate,
-																D_area.coordinate)
-
-	'''	Formula for average of Percent Host column
-	'''
-	percent_host_avg = ws.cell(row=3+2*len(markers), column=percent_host_col)
-	start = ws.cell(row=3, column=percent_host_col)
-	end = ws.cell(row=2+2*len(markers), column=percent_host_col)
-	percent_host_avg.value = '=AVERAGE({}:{})'.format(start.coordinate, end.coordinate)
-
-	percent_donor_avg = ws.cell(row=4+2*len(markers), column=percent_host_col)
-	percent_donor_avg.value = '=100-{}'.format(percent_host_avg.coordinate)
+		percent_donor_avg = ws.cell(row=4+2*len(markers), column=percent_host_col)
+		percent_donor_avg.value = '=100-{}'.format(percent_host_avg.coordinate)
 
 
 	if file_path is not None:
@@ -456,12 +466,12 @@ def on_export_template_click():
 
 
 def on_select_alleles_change(attrname, old, new):
-	global p0_current_case, df_cases
+	global df_cases
 
-	indices = allele_table_p0c1.source.selected.indices[:]
-	source_cases[p0_current_case].selected.indices = indices[:]
-	df_cases[p0_current_case].loc[:,'Selected'] = False
-	df_cases[p0_current_case].loc[indices,'Selected'] = True
+	indices = p0c1_allele_table.source.selected.indices[:]
+	source_cases[global_dict['p0_current_case']].selected.indices = indices[:]
+	df_cases[global_dict['p0_current_case']].loc[:,'Selected'] = False
+	df_cases[global_dict['p0_current_case']].loc[indices,'Selected'] = True
 	refresh_template_preview_table()
 
 
@@ -507,10 +517,11 @@ def on_select_template_click():
 			df.columns = col_letters
 			df = df.fillna('')
 			df_col = df.columns.tolist()
-			columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+			columns = [TableColumn(field=col, title=col, width=75) for col in df_col[0]]
+			columns.extend([TableColumn(field=col, title=col, width=50) for col in df_col[1:-2]])
 			columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-			template_table_p1c1.columns = columns
-			template_table_p1c1.source.data = ColumnDataSource(df).data
+			p1c1_template_table.columns = columns
+			p1c1_template_table.source.data = ColumnDataSource(df).data
 
 def redo_formulae():
 	pass
@@ -588,10 +599,11 @@ def on_select_samples_change(attrname, old, new):
 			df_filled.columns = col_letters
 			df_filled = df_filled.fillna('')
 			df_col = df_filled.columns.tolist()
-			columns = [TableColumn(field=col, title=col, width=50) for col in df_col[0:-2]]
+			columns = [TableColumn(field=col, title=col, width=75) for col in df_col[0]]
+			columns.extend([TableColumn(field=col, title=col, width=50) for col in df_col[1:-2]])
 			columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-			template_table_p1c1.columns = columns
-			template_table_p1c1.source.data = ColumnDataSource(df_filled).data
+			p1c1_template_table.columns = columns
+			p1c1_template_table.source.data = ColumnDataSource(df_filled).data
 
 
 results_files = []
@@ -634,9 +646,11 @@ select_samples.on_change('value', on_select_samples_change)
 export_results = Button(label='Export Results To Excel File', button_type='warning')
 export_results.on_click(on_export_results_click)
 
+p0c1_table_title = Div(text='<sample>', sizing_mode='fixed')
+p0c2_table_title = Div(text='Template', sizing_mode='fixed')
 
-columns = [TableColumn(field='Sample File Name', title='Sample File Name', width=300),
-			TableColumn(field='Marker', title='Marker', width=50),
+columns = [#TableColumn(field='Sample File Name', title='Sample File Name', width=300),
+			TableColumn(field='Marker', title='Marker', width=75),
 			TableColumn(field='Allele', title='Allele', width=50),
 			TableColumn(field='Area', title='Area', width=50)]
 
@@ -644,9 +658,9 @@ columns = [TableColumn(field='Sample File Name', title='Sample File Name', width
 source = ColumnDataSource()
 source.selected.on_change('indices', on_select_alleles_change)
 
-allele_table_p0c1 = DataTable(columns=columns, source=source, selectable='checkbox', fit_columns=True)
-template_table_p0c2 = DataTable(source=ColumnDataSource(), fit_columns=True)
-template_table_p1c1 = DataTable(source=ColumnDataSource(), fit_columns=True)
+p0c1_allele_table = DataTable(columns=columns, source=source, selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300)
+p0c2_template_table = DataTable(source=ColumnDataSource(), fit_columns=True, sizing_mode='stretch_both')
+p1c1_template_table = DataTable(source=ColumnDataSource(), fit_columns=True)
 
 
 p0c0 = column(enter_host_name,
@@ -654,11 +668,13 @@ p0c0 = column(enter_host_name,
 				results_text,
 				select_host_case,
 				select_donor_cases,
-				export_template)
+				export_template,
+				sizing_mode='fixed')
 
-p0c1 = column(allele_table_p0c1, sizing_mode='stretch_height')
+p0c1 = column(p0c1_table_title, p0c1_allele_table, sizing_mode='stretch_height')
 
-p0c2 = column(template_table_p0c2, sizing_mode='scale_height')
+p0c2 = column(p0c2_table_title, p0c2_template_table, sizing_mode='stretch_both')
+# p0c2 = column(p0c2_template_table)
 
 p1c0 = column(select_results,
 				results_text,
@@ -667,9 +683,10 @@ p1c0 = column(select_results,
 				select_samples,
 				export_results)
 
-p1c1 = column(template_table_p1c1, sizing_mode='scale_height')
+p1c1 = column(p1c1_template_table, sizing_mode='scale_height')
 
-child_0 = row(p0c0, p0c1, p0c2, sizing_mode='stretch_height')
+child_0 = row(p0c0, p0c1, p0c2, sizing_mode='stretch_both')
+# child_0 = row(p0c0, p0c1, p0c2)
 child_1 = row(p1c0, p1c1, sizing_mode='stretch_height')
 tab1 = Panel(child=child_0, title='Make Template')
 tab2 = Panel(child=child_1, title='Populate Results')
