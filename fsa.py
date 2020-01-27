@@ -60,7 +60,7 @@ def use_csv_module(filename):
 	return df
 
 
-def fix_formatting(filename, header=None, case_name=None):
+def fix_formatting(filename, patient_name='', case_name=None):
 	''' Helper function '''
 	def border_add(border, top=None, right=None, left=None, bottom=None):
 		if top is None:
@@ -83,8 +83,7 @@ def fix_formatting(filename, header=None, case_name=None):
 	ws = wb.worksheets[0]
 
 	'''	Insert header '''
-	if header is not None:
-		ws.oddHeader = header
+	ws.oddHeader.center.text = patient_name
 
 	''' By default make all cells horizontal='center', except for the first and last two columns
 	'''
@@ -147,8 +146,6 @@ def fix_formatting(filename, header=None, case_name=None):
 			cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
 			cell.value = case_name
 
-	if header is not None:
-		ws.oddHeader = header
 	ws.sheet_view.view = 'pageLayout'
 	openpyxl.worksheet.worksheet.Worksheet.set_printer_settings(
 		ws, paper_size=1, orientation='landscape')
@@ -280,3 +277,20 @@ def build_results_dict(df=None):
 	# for k,v in peaks.items():
 	# 	print(k,v)
 	return peaks
+
+
+def get_patient_name_from_header(file_path):
+	if file_path is not None:
+		if file_path.endswith('.xlsx'):
+			pass
+		elif file_path.endswith('.xls') and os.path.isfile(file_path + 'x'):
+			file_path = file_path + 'x'
+		elif file_path.endswith('.xls'):
+			file_path = convert_xls_to_xlsx(file_path)
+		else:
+			return ''
+
+		wb = openpyxl.load_workbook(file_path)
+		ws = wb.worksheets[0]
+		wb.close()
+	return ws.oddHeader.center.text

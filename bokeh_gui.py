@@ -114,7 +114,7 @@ def on_results_click():
 	root.destroy()
 	if basename(file_path) not in results_files:
 		results_files.append(basename(file_path))
-		results_text.value = '\n'.join(results_files)
+		pNc0_results_text.value = '\n'.join(results_files)
 
 		df_new = use_csv_module(file_path)
 		df_new = reduce_rows(df_new)
@@ -132,12 +132,12 @@ def on_results_click():
 			source_cases[case] = ColumnDataSource(df_copy)
 			source_cases[case].selected.indices = indices
 
-		select_host_case.options = list(source_cases.keys())
-		select_donor_cases.options = list(source_cases.keys())
-		select_samples.options = list(source_cases.keys())
+		p0c0_select_host_case.options = list(source_cases.keys())
+		p0c0_select_donor_cases.options = list(source_cases.keys())
+		p1c0_select_samples.options = list(source_cases.keys())
 
 	if len(results_files) == 1:
-		select_host_case.value = list(source_cases.keys())[0]
+		p0c0_select_host_case.value = list(source_cases.keys())[0]
 
 
 def pre_selected_indices(df):
@@ -175,13 +175,13 @@ def make_template_wb(file_path=None):
 
 
 	markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
-	host_case = select_host_case.value
+	host_case = p0c0_select_host_case.value
 	df_host = df_cases[host_case]
 	df_host = df_host.loc[df_host['Selected'] == True]
 	# print('df_host')
 	# print(df_host)
 
-	donor_cases = select_donor_cases.value
+	donor_cases = p0c0_select_donor_cases.value
 	donors = {}
 	for donor_case in donor_cases:
 		df_donor = df_cases[donor_case]
@@ -192,7 +192,7 @@ def make_template_wb(file_path=None):
 	ws = wb.active
 	'''	Header, etc.
 	'''
-	ws.oddHeader.center.text = enter_host_name.value
+	ws.oddHeader.center.text = p0c0_enter_host_name.value
 	# ws.oddHeader.center.size = 14
 	ws.cell(row=2, column=1, value='Marker')
 	ws.cell(row=2, column=2, value='Host')
@@ -462,7 +462,7 @@ def on_export_template_click():
 	file_path = asksaveasfilename(defaultextension = '.xlsx',
 									filetypes=[('Excel', '*.xlsx')],
 									title = 'Save Template',
-									initialfile=enter_host_name.value)
+									initialfile=p0c0_enter_host_name.value)
 	root.destroy()
 	if file_path.endswith('.xlsx'):
 		make_template_wb(file_path)
@@ -498,16 +498,24 @@ def on_select_template_click():
 	if file_path is not None and file_path != '':
 	# drop_empty_columns_and_adjust_formulae(file_path)
 		''' Update template_text box'''
-		template_text.value = basename(file_path)
+		p1c0_template_text.value = basename(file_path)
 		global_dict['template_path'] = file_path
 		# global template_path
 		# template_path = file_path
 		# df = build_profile_2(template=global_dict['template_path'])
 		# makeshift_results_dictionary(template=global_dict['template_path'])
 		wb = make_template_from_existing_template(template=global_dict['template_path'])
+		patient_name = get_patient_name_from_header(global_dict['template_path'])
+		# print('patient_name = {}'.format(patient_name))
+		if patient_name is None or patient_name == '':
+			template_path = global_dict['template_path']
+			patient_name = basename(template_path)
+			patient_name = patient_name.replace('.xlsx', '')
+			patient_name = patient_name.replace('.xls', '')
+		p1c0_enter_host_name.value = patient_name
 		df = pd.DataFrame(wb.worksheets[0].values)
 		global_dict['p1_template_df'] = df.copy(deep=True)
-		print(df)
+		# print(df)
 		# wb = openpyxl.load_workbook(file_path)
 		# ws = wb.worksheets[0]
 		# df = pd.DataFrame(ws.values)
@@ -552,10 +560,11 @@ def on_export_results_click():
 	# global template_path
 	template_path = global_dict['template_path']
 
-	header = get_header(template_path)
-	patient_name = header.center.text
+	# header = get_header(template_path)
+	# patient_name = header.center.text
+	patient_name = p1c0_enter_host_name.value
 
-	for sample in select_samples.value:
+	for sample in p1c0_select_samples.value:
 		'''	Construct output file name '''
 		output_file_name = patient_name + ' ' + re.sub(r'_PTE.*$', '', sample)
 		root = tk.Tk()
@@ -567,19 +576,27 @@ def on_export_results_click():
 										initialfile = output_file_name)
 		root.destroy()
 
-		df = df_cases[sample]
-		# print(df)
-		results = build_results_dict(df)
-		# print(results)
-		df_filled = build_profile_2(res=results, sample_name=sample, template=global_dict['p1_template_df'])
-		# global_dict['p1_template_df'] = df_filled.copy(deep=True)
-		# print(df_filled)
+		if output_file_name is not None and output_file_name != '':
+			if output_file_name.endswith('.xlsx'):
+				pass
+			elif output_file_name.endswith('.xls'):
+				output_file_name = output_file_name + 'x'
+			else:
+				output_file_name = output_file_name + '.xlsx'
 
-		# col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
-		# df_filled.columns = col_letters
-		df_filled = df_filled.fillna('')
-		df_filled.to_excel(output_file_name, index=False, header=False)
-		fix_formatting(output_file_name, header)
+			df = df_cases[sample]
+			# print(df)
+			results = build_results_dict(df)
+			# print(results)
+			df_filled = build_profile(res=results, sample_name=sample, template=global_dict['p1_template_df'])
+			# global_dict['p1_template_df'] = df_filled.copy(deep=True)
+			# print(df_filled)
+
+			# col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
+			# df_filled.columns = col_letters
+			df_filled = df_filled.fillna('')
+			df_filled.to_excel(output_file_name, index=False, header=False)
+			fix_formatting(filename=output_file_name, patient_name=p1c0_enter_host_name.value)
 
 
 def on_select_samples_change(attrname, old, new):
@@ -595,7 +612,7 @@ def on_select_samples_change(attrname, old, new):
 		# print(df)
 		results = build_results_dict(df)
 		# pprint(results)
-		df_filled = build_profile_2(res=results, sample_name=global_dict['p1_current_case'], template=global_dict['p1_template_df'])
+		df_filled = build_profile(res=results, sample_name=global_dict['p1_current_case'], template=global_dict['p1_template_df'])
 		global_dict['p1_template_df'] = df_filled.copy(deep=True)
 		if not df_filled.empty:
 			# print(df_filled)
@@ -620,41 +637,42 @@ results_files = []
 source_cases = {}
 df_cases = {}
 
-select_results = Button(label='Add GeneMapper Results', button_type='success')
-select_results.on_click(on_results_click)
-results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
+pNc0_select_results = Button(label='Add GeneMapper Results', button_type='success')
+pNc0_select_results.on_click(on_results_click)
+pNc0_results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
 
 
 # select_host_case = Select(title='Select Host', options=list(source_cases.keys()))
-select_host_case = Select(title='Select Host', options=[])
-select_host_case.on_change('value', on_host_click)
+p0c0_select_host_case = Select(title='Select Host', options=[])
+p0c0_select_host_case.on_change('value', on_host_click)
 
 
-select_donor_cases = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>',
+p0c0_select_donor_cases = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>',
 								options=[],
 								size=20)
-select_donor_cases.on_change('value', on_donor_change)
+p0c0_select_donor_cases.on_change('value', on_donor_change)
 
 
-export_template = Button(label='Export Template', button_type='warning')
-export_template.on_click(on_export_template_click)
+p0c0_export_template = Button(label='Export Template', button_type='warning')
+p0c0_export_template.on_click(on_export_template_click)
 
 
-enter_host_name = TextInput(title='Enter Host Name', value='<type host name here>')
+p0c0_enter_host_name = TextInput(title='Enter Host Name', value='<type host name here>')
+p1c0_enter_host_name = TextInput(title='Enter Host Name', value='<type host name here>')
 
 
-select_template = Button(label='Select Template', button_type='success')
-select_template.on_click(on_select_template_click)
-template_text = TextAreaInput(value='<template file>', disabled=True)
+p1c0_select_template = Button(label='Select Template', button_type='success')
+p1c0_select_template.on_click(on_select_template_click)
+p1c0_template_text = TextAreaInput(value='<template file>', disabled=True)
 
 
-select_samples = MultiSelect(title='Select Sample(s) <ctrl+click to multiselect>',
+p1c0_select_samples = MultiSelect(title='Select Sample(s) <ctrl+click to multiselect>',
 									options=[],
 									size=20)
-select_samples.on_change('value', on_select_samples_change)
+p1c0_select_samples.on_change('value', on_select_samples_change)
 
-export_results = Button(label='Export Results To Excel File', button_type='warning')
-export_results.on_click(on_export_results_click)
+p1c0_export_results = Button(label='Export Results To Excel File', button_type='warning')
+p1c0_export_results.on_click(on_export_results_click)
 
 p0c1_table_title = Div(text='<sample>', sizing_mode='fixed')
 p0c2_table_title = Div(text='Template', sizing_mode='fixed')
@@ -673,12 +691,12 @@ p0c2_template_table = DataTable(source=ColumnDataSource(), fit_columns=True, siz
 p1c1_template_table = DataTable(source=ColumnDataSource(), fit_columns=True)
 
 
-p0c0 = column(enter_host_name,
-				select_results,
-				results_text,
-				select_host_case,
-				select_donor_cases,
-				export_template,
+p0c0 = column(p0c0_enter_host_name,
+				pNc0_select_results,
+				pNc0_results_text,
+				p0c0_select_host_case,
+				p0c0_select_donor_cases,
+				p0c0_export_template,
 				sizing_mode='fixed')
 
 p0c1 = column(p0c1_table_title, p0c1_allele_table, sizing_mode='stretch_height')
@@ -686,12 +704,13 @@ p0c1 = column(p0c1_table_title, p0c1_allele_table, sizing_mode='stretch_height')
 p0c2 = column(p0c2_table_title, p0c2_template_table, sizing_mode='stretch_both')
 # p0c2 = column(p0c2_template_table)
 
-p1c0 = column(select_results,
-				results_text,
-				select_template,
-				template_text,
-				select_samples,
-				export_results)
+p1c0 = column(p1c0_enter_host_name,
+				pNc0_select_results,
+				pNc0_results_text,
+				p1c0_select_template,
+				p1c0_template_text,
+				p1c0_select_samples,
+				p1c0_export_results)
 
 p1c1 = column(p1c1_template_table, sizing_mode='scale_height')
 
