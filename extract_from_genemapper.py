@@ -74,9 +74,10 @@ def make_results_dict_from_template(template):
 			donor_case = str(ws.cell(row=donor_cell.row - 1, column=donor_cell.column).value)
 
 		markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
-		marker_cells = [cell_with_value(ws, marker) for marker in markers]
+		marker_cells = [cell_with_value(ws, marker) for marker in markers if cell_with_value(ws, marker) is not None]
 
-		for marker, marker_cell in zip(markers, marker_cells):
+		for marker_cell in marker_cells:
+			marker = str(marker_cell.value)
 			# print('now looping through marker cells')
 			# print(marker, marker_cell.value)
 			host_allele_0 = ws.cell(row=marker_cell.row, column=host_cell.column).value

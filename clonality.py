@@ -21,6 +21,10 @@ from bokeh.core.validation import silence
 import easygui
 from convert_fsa_to_csv import convert_folder
 
+pd.set_option('display.max_columns', 20)
+pd.set_option('display.width', 1000)
+pd.set_option('display.max_rows', 50)
+
 TOOLTIPS = [("(x,y)", "($x{1.1}, $y{int})")]
 silence(FIXED_SIZING_MODE, True)
 
@@ -307,7 +311,8 @@ def build_ladder(df, size_standard, label_name):
 
 def reduce_choices(ds, label_name):
     t = 2.0
-    print(ds)
+    # print('label_name = {}'.format(label_name))
+    # print(ds)
     try:
         peaks_x_restricted, _ = find_peaks(
             ds, height=[20, 1000], distance=30, width=2)
@@ -806,9 +811,9 @@ def main():
         case = gather_case_data(case, case_name, path)
         case = size_standard(case, ch_ss_num=4)
         case = find_artifactual_peaks(case)
-        case = baseline_correction_simple(case)
-        # case = baseline_correction_advanced(
-        #     case, ch_list=channels_of_interest.keys(), distance=10)
+        # case = baseline_correction_simple(case)
+        case = baseline_correction_advanced(
+            case, ch_list=channels_of_interest.keys(), distance=10)
         # case = pick_peak_one(case)
         # case = make_decay_curve(case)
         case = local_southern(case)
