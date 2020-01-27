@@ -10,11 +10,11 @@ from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askdirectory, asksaveasfilename
 
 import pandas as pd
-from fsa import use_csv_module, fix_formatting, get_col_to_drop, convert_xls_to_xlsx
+from fsa import *
 import copy
 import openpyxl
 from openpyxl.styles import Alignment
-from extract_from_genemapper import build_results_dict, build_profile_2, get_header
+from extract_from_genemapper import *
 import re
 
 from pprint import pprint
@@ -27,6 +27,7 @@ global_dict = {
 	'template_path': None,
 	'p0_template_path': None,
 	'p1_template_path': None,
+	'p1_template_df': pd.DataFrame(),
 	'p0_host': None,
 	'p0_donors': [],
 	'p0_current_case': None,
@@ -73,6 +74,8 @@ def refresh_template_preview_table():
 		ws = wb.worksheets[0]
 		df = pd.DataFrame(ws.values)
 		df.loc[-1] = ''
+		# print('Inside of refresh_template_preview_table')
+		# print(df)
 		# df.loc[-1] = df.columns.tolist()
 		df.index = df.index + 1
 		df.sort_index(inplace=True)
@@ -499,7 +502,12 @@ def on_select_template_click():
 		global_dict['template_path'] = file_path
 		# global template_path
 		# template_path = file_path
-		df = build_profile_2(template=global_dict['template_path'])
+		# df = build_profile_2(template=global_dict['template_path'])
+		# makeshift_results_dictionary(template=global_dict['template_path'])
+		wb = make_template_from_existing_template(template=global_dict['template_path'])
+		df = pd.DataFrame(wb.worksheets[0].values)
+		global_dict['p1_template_df'] = df.copy(deep=True)
+		print(df)
 		# wb = openpyxl.load_workbook(file_path)
 		# ws = wb.worksheets[0]
 		# df = pd.DataFrame(ws.values)
@@ -563,7 +571,8 @@ def on_export_results_click():
 		# print(df)
 		results = build_results_dict(df)
 		# print(results)
-		df_filled = build_profile_2(res=results, sample_name=sample, template=template_path)
+		df_filled = build_profile_2(res=results, sample_name=sample, template=global_dict['p1_template_df'])
+		# global_dict['p1_template_df'] = df_filled.copy(deep=True)
 		# print(df_filled)
 
 		# col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
@@ -586,7 +595,8 @@ def on_select_samples_change(attrname, old, new):
 		# print(df)
 		results = build_results_dict(df)
 		# pprint(results)
-		df_filled = build_profile_2(res=results, sample_name=global_dict['p1_current_case'], template=global_dict['template_path'])
+		df_filled = build_profile_2(res=results, sample_name=global_dict['p1_current_case'], template=global_dict['p1_template_df'])
+		global_dict['p1_template_df'] = df_filled.copy(deep=True)
 		if not df_filled.empty:
 			# print(df_filled)
 			df_filled.loc[-1] = ''

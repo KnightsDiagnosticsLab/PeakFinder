@@ -35,6 +35,18 @@ def get_col_to_drop(df):
 	return col_to_drop
 
 
+def df_to_wb(df):
+	wb = openpyxl.Workbook()
+	ws = wb.active
+
+	# print(df)
+	for row_num, row_name in enumerate(df.index.tolist()):
+		for col_num, col_name in enumerate(df.columns.tolist()):
+			ws.cell(row=row_num + 1, column=col_num + 1).value = df.iloc[row_num, col_num]
+
+	return wb
+
+
 def use_csv_module(filename):
 	with open(filename, newline='') as csvfile:
 		dialect = csv.Sniffer().sniff(csvfile.read(1024))
@@ -176,6 +188,27 @@ def locations_of_value(ws, val):
 				locs.append(cell.coordinate)
 	return locs
 
+
+def idx_of_value(ws, val):
+	idx = [None, None]
+	for r in range(1, ws.max_row + 1):
+		for c in range(1, ws.max_column + 1):
+			cell = ws.cell(row=r, column=c)
+			if val == cell.value:
+				idx = [cell.column, cell.row]
+				return idx
+	return idx
+
+
+def cell_with_value(ws, val):
+	for r in range(1, ws.max_row + 1):
+		for c in range(1, ws.max_column + 1):
+			cell = ws.cell(row=r, column=c)
+			if cell.value == val:
+				return cell
+	return None
+
+
 def location_of_value(ws, val):
 	loc = None
 	# print('\t************ ws.max_column = {}'.format(ws.max_column))
@@ -197,3 +230,53 @@ def location_of_value(ws, val):
 				# print('loc of {} = {}'.format(val, loc))
 				return loc
 	return loc
+
+def replace_cell_ref_with_value(df):
+	# print('now inside replace_cell_ref_with_value')
+	wb = df_to_wb(df)
+	ws = wb.worksheets[0]
+	# allele_locs = locations_of_value(ws, 'Allele')
+	# host_loc = location_of_value(ws, 'ENG Host:')
+	# donor_loc = location_of_value(ws, 'DEG Donor:')
+	for r in range(1,ws.max_row+1):
+		for c in range(1,ws.max_column+1):
+			cell = ws.cell(row=r, column=c)
+			if re.fullmatch('=[A-Z]+\d+',str(cell.value)):
+				coor = str(cell.value).replace('=','')
+				cell.value = ws[coor].value
+	df = pd.DataFrame(ws.values)
+	# print(df)
+	return df
+
+
+def build_results_dict(df=None):
+	peaks = {}
+
+	# if not isinstance(df, pd.DataFrame):
+	# 	filename = easygui.fileopenbox(
+	# 		msg='Select results file')
+	# 	if filename is None:
+	# 		exit()
+	# 	df = use_csv_module(filename)
+
+	if isinstance(df, pd.DataFrame):
+		df = df[['Sample File Name', 'Marker', 'Allele', 'Area']]
+
+		'''	Get rid of peaks that aren't assigned an allele '''
+		df = df.dropna(axis=0, how='any', inplace=False)
+
+		'''	Get rid of OL (off ladder) peaks '''
+		df = df[df['Allele'] != 'OL']
+		df = df.reset_index(drop=True, inplace=False)
+
+		fnames = set()
+		for i in df.index:
+			file_name = str(df.iloc[i]['Sample File Name'])
+			fnames.add(file_name)
+			locus = str(df.iloc[i]['Marker'])
+			allele = str(df.iloc[i]['Allele'])
+			key = (file_name, locus, allele)
+			peaks[key] = peaks.get(key, 0) + int(df.iloc[i]['Area'])
+	# for k,v in peaks.items():
+	# 	print(k,v)
+	return peaks
