@@ -531,7 +531,7 @@ def on_select_template_click():
 			p1c1_template_table.columns = columns
 			p1c1_template_table.source.data = ColumnDataSource(df).data
 
-def redo_formulae():
+def check_if_multiple_donors():
 	pass
 
 
