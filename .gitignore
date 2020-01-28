@@ -1,0 +1,9 @@
+*.pyc
+*.toc
+*.pkg
+*.pyz
+*.spec
+*.json
+.vscode/settings.json
+.vscode/.ropeproject/objectdb
+.vscode/.ropeproject/objectdb
