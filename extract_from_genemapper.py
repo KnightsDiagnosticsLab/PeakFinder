@@ -7,7 +7,7 @@ import pandas as pd
 import easygui
 import openpyxl
 from openpyxl.styles import Border, Side, PatternFill, Font, GradientFill, Alignment
-from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
+from openpyxl.utils.cell import coordinate_from_string, column_index_from_string, get_column_letter, get_column_interval
 import win32com.client as win32
 import csv
 from fsa import *
@@ -101,6 +101,43 @@ def make_results_dict_from_template(template):
 	# print('host_case = {}'.format(host_case))
 	# print('donor_case = {}'.format(donor_case))
 	return results_dict, host_case, donor_case
+
+
+def load_workbook_range(range_string, ws):
+	col_start, col_end = re.findall("[A-Z]+", range_string)
+
+	data_rows = []
+	for row in ws[range_string]:
+		data_rows.append([cell.value for cell in row])
+
+	return pd.DataFrame(data_rows, columns=get_column_interval(col_start, col_end))
+
+
+def copy_paste_bottom_few_rows(ws_old, ws_new):
+	'''	First, we'll drop any empty columns in ws_old '''
+
+	old_area = all_cells_with_value(ws_old, 'Area', regex=False)[-1]
+
+	range_start = 'A' + str(old_area.row + 1)
+	range_end = get_column_letter(old_area.column) + str(ws_old.max_row)
+	range_string = range_start + ':' + range_end
+
+	df = load_workbook_range(range_string, ws_old)
+	col_to_drop = get_col_to_drop(df)
+	df.drop(axis=1, columns=col_to_drop, inplace=True)
+
+	new_area = all_cells_with_value(ws_new, 'Area', regex=False)[-1]
+	r_start = new_area.row + 1
+	c_start = 1
+
+	for i, _ in enumerate(df.index.tolist()):
+		for j, _ in enumerate(df.columns.tolist()):
+			r = r_start + i
+			c = c_start + j
+			ws_new.cell(row=r, column=c).value = str(df.iloc[i,j])
+	
+	return ws_new
+
 
 
 def make_template_from_existing_template(template):
@@ -371,14 +408,21 @@ def make_template_from_existing_template(template):
 	# df = pd.DataFrame(ws.values)
 	# print(df)
 
+	'''	Insert "Post-T"'''
+	allele_cell = first_cell_with_value(ws, 'Allele', regex=False)
+	ws.cell(row=allele_cell.row - 2, column=allele_cell.column + 1).value = 'Post-T:'
+
+	wb_old = openpyxl.load_workbook(template, read_only=True)
+	ws_old = wb_old.worksheets[0]
+	ws = copy_paste_bottom_few_rows(ws_old, ws)
+
 	wb.close()
 
 	return wb
 
 
-def build_profile(template, sample_name='', res={}):
+def fill_template_with_areas(template, sample_name='', res={}):
 	# print('Now running build_profile')
-
 	# print(template)
 	# pprint(res)
 	if isinstance(template, pd.DataFrame):
@@ -393,14 +437,6 @@ def build_profile(template, sample_name='', res={}):
 			# print(template_path)
 			wb = openpyxl.load_workbook(template)
 			ws = wb.worksheets[0]
-
-			'''	Insert case number near top '''
-			case_name = re.sub(r'_PTE.*$', '', sample_name)
-			post_T_cell = first_cell_with_value(ws, r'Post.T', regex=True)
-			if post_T_cell is not None:
-				ws.cell(row=post_T_cell.row, column=post_T_cell.column + 1).value = case_name
-				# cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
-				# cell.value = case_name
 			
 			df = pd.DataFrame(ws.values)
 			wb.close()
@@ -420,13 +456,11 @@ def build_profile(template, sample_name='', res={}):
 		'[vV][wW][aA]':'vWA',
 		'[aA][mM][eE][lL][oO][gG][eE][nN][iI][nN]':'AMEL',
 	}
-
 	# df.replace(to_replace='[vV][wW][aA]', value='vWA', regex=True, inplace=True)
 	# df.replace(to_replace='[aA][mM][eE][lL][oO][gG][lL][oO][bB][iI][nN]', value='AMEL', regex=True, inplace=True)
 	df.replace(to_replace=replacement_dict_no_regex, inplace=True, regex=False)
 	df.replace(to_replace=replacement_dict_yes_regex, inplace=True, regex=True)
 	# print(df)
-
 	''' Get locations of 'Allele' '''
 	allele_ij = []
 	for i in df.index:
@@ -434,9 +468,7 @@ def build_profile(template, sample_name='', res={}):
 			if v == 'Allele':
 				allele_ij.append([i, j])
 	# print(allele_ij)
-
 	# print(df)
-
 	'''	replace cells that reference other cells with the ref cell's value '''
 	df = replace_cell_ref_with_value(df)
 
@@ -460,7 +492,6 @@ def build_profile(template, sample_name='', res={}):
 			df.iat[i + 1, j + k] = res.get(key, pd.np.nan)
 			# print('\tcoor = {}, value = {}'.format(coor, x))
 
-
 	'''	Drop empty columns. Note that this should only be done after formulae are replaced with values '''
 	col_to_drop = get_col_to_drop(df)
 	df.drop(axis=1, columns=col_to_drop, inplace=True)
@@ -468,8 +499,22 @@ def build_profile(template, sample_name='', res={}):
 	'''	Get rid of the remaining 'Unnamed: #' column labels '''
 	df.rename(columns=lambda x: re.sub(r'Unnamed.*', '', str(x)), inplace=True)
 
-	# wb = df_to_wb(df)
-
+	''' Add in case_name '''
+	wb = df_to_wb(df)
+	ws = wb.worksheets[0]
+	sample_case_abbrev = re.sub(r'_PTE.*$', '', str(sample_name))
+	post_T_cell = first_cell_with_value(ws, 'Post-T:')
+	if post_T_cell is not None:
+		r = post_T_cell.row
+		c = post_T_cell.column
+		ws.cell(row=r, column=c+1).value = sample_case_abbrev
+	else:
+		allele_cell = first_cell_with_value(ws, 'Allele')
+		r = allele_cell.row
+		c = allele_cell.column
+		ws.cell(row=r-2, column=c+1).value = 'Post-T:'
+		ws.cell(row=r-2, column=c+2).value = sample_case_abbrev
+	df = pd.DataFrame(ws.values)
 	# print(df)
 	return df
 
