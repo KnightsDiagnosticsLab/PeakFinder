@@ -7,3 +7,4 @@
 .vscode/settings.json
 .vscode/.ropeproject/objectdb
 .vscode/.ropeproject/objectdb
+*.pyc
