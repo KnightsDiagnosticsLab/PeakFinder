@@ -55,7 +55,7 @@ def reduce_rows(df):
 	return df
 
 
-def on_donor_change(attrname, old, new):
+def p0c0_on_donor_change(attrname, old, new):
 	global p0c1_allele_table
 
 	newest = [c for c in new if c not in old]
@@ -65,16 +65,16 @@ def on_donor_change(attrname, old, new):
 		p0c1_table_title.text = str(global_dict['p0_current_case'])
 		p0c1_allele_table.source.data = source_cases[newest[0]].data
 		p0c1_allele_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
-	refresh_template_preview_table()
+	refresh_p0_template_preview_table()
 
 
-def refresh_template_preview_table():
+def refresh_p0_template_preview_table():
 		''' Preview Template '''
 		wb = make_template_wb()
 		ws = wb.worksheets[0]
 		df = pd.DataFrame(ws.values)
 		df.loc[-1] = ''
-		# print('Inside of refresh_template_preview_table')
+		# print('Inside of refresh_p0_template_preview_table')
 		# print(df)
 		# df.loc[-1] = df.columns.tolist()
 		df.index = df.index + 1
@@ -90,7 +90,7 @@ def refresh_template_preview_table():
 		p0c2_template_table.source.data = ColumnDataSource(df).data
 
 
-def on_host_click(attrname, old, new):
+def p0c0_on_host_click(attrname, old, new):
 	global source_cases, p0c1_allele_table
 
 	global_dict['p0_current_case'] = new
@@ -99,7 +99,7 @@ def on_host_click(attrname, old, new):
 	p0c1_allele_table.source.selected.indices = source_cases[new].selected.indices[:]
 
 
-def on_results_click():
+def pNc0_on_results_click():
 	global source_cases, results_files, df, p0c1_allele_table, df_cases
 
 	root = tk.Tk()
@@ -109,7 +109,8 @@ def on_results_click():
 											('Comma Separated Values','*.csv'),
 											('Tab Separated Values','*.tsv'),
 										),
-								title = 'Choose GeneMapper results file.'
+								title = 'Choose GeneMapper results file.',
+								initialdir=r'X:\Hospital\Genetics Lab\DNA_Lab\3-Oncology Tests\Engraftment\ABI PTE Runs'
 							)
 	root.destroy()
 	if basename(file_path) not in results_files:
@@ -117,24 +118,25 @@ def on_results_click():
 		pNc0_results_text.value = '\n'.join(results_files)
 
 		df_new = use_csv_module(file_path)
-		df_new = reduce_rows(df_new)
+		if not df_new.empty:
+			df_new = reduce_rows(df_new)
 
-		case_names = sorted(list(set(df_new['Sample File Name'].to_list())))
+			case_names = sorted(list(set(df_new['Sample File Name'].to_list())))
 
-		for case in case_names:
-			df_copy = df_new.loc[df_new['Sample File Name'] == case].copy(deep=True)
-			df_copy.reset_index(inplace=True, drop=True)
-			df_copy['Selected'] = False
-			indices = pre_selected_indices(df_copy)
-			df_copy.loc[indices,'Selected'] = True
-			df_cases[case] = df_copy
-			# print(df_copy)
-			source_cases[case] = ColumnDataSource(df_copy)
-			source_cases[case].selected.indices = indices
+			for case in case_names:
+				df_copy = df_new.loc[df_new['Sample File Name'] == case].copy(deep=True)
+				df_copy.reset_index(inplace=True, drop=True)
+				df_copy['Selected'] = False
+				indices = pre_selected_indices(df_copy)
+				df_copy.loc[indices,'Selected'] = True
+				df_cases[case] = df_copy
+				# print(df_copy)
+				source_cases[case] = ColumnDataSource(df_copy)
+				source_cases[case].selected.indices = indices
 
-		p0c0_select_host_case.options = list(source_cases.keys())
-		p0c0_select_donor_cases.options = list(source_cases.keys())
-		p1c0_select_samples.options = list(source_cases.keys())
+			p0c0_select_host_case.options = list(source_cases.keys())
+			p0c0_select_donor_cases.options = list(source_cases.keys())
+			p1c0_select_samples.options = list(source_cases.keys())
 
 	if len(results_files) == 1:
 		p0c0_select_host_case.value = list(source_cases.keys())[0]
@@ -455,7 +457,7 @@ def make_template_wb(file_path=None):
 	return wb
 
 
-def on_export_template_click():
+def p0c0_on_export_template_click():
 	root = tk.Tk()
 	root.attributes("-topmost", True)
 	root.withdraw()		# hide the root tk window
@@ -468,17 +470,17 @@ def on_export_template_click():
 		make_template_wb(file_path)
 
 
-def on_select_alleles_change(attrname, old, new):
+def p0c1_on_select_alleles_change(attrname, old, new):
 	global df_cases
 
 	indices = p0c1_allele_table.source.selected.indices[:]
 	source_cases[global_dict['p0_current_case']].selected.indices = indices[:]
 	df_cases[global_dict['p0_current_case']].loc[:,'Selected'] = False
 	df_cases[global_dict['p0_current_case']].loc[indices,'Selected'] = True
-	refresh_template_preview_table()
+	refresh_p0_template_preview_table()
 
 
-def on_select_template_click():
+def p1c0_on_select_template_click():
 	root = tk.Tk()
 	root.attributes("-topmost", True)
 	root.withdraw()		# hide the root tk window
@@ -515,48 +517,16 @@ def on_select_template_click():
 		p1c0_enter_host_name.value = patient_name
 		df = pd.DataFrame(wb.worksheets[0].values)
 		global_dict['p1_template_df'] = df.copy(deep=True)
-		# print(df)
-		# wb = openpyxl.load_workbook(file_path)
-		# ws = wb.worksheets[0]
-		# df = pd.DataFrame(ws.values)
-		# wb.close()
-		# col_to_drop = get_col_to_drop(df)
-		# df.drop(axis=1, columns=col_to_drop, inplace=True)
-		# print(df)
-		if not df.empty:
-			df.loc[-1] = ''
-			# print('doing the whole template thing')
-			# df.loc[-1] = df.columns.tolist()
-			df.index = df.index + 1
-			df.sort_index(inplace=True)
-			col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df.columns.tolist()]
-			df.columns = col_letters
-			df = df.fillna('')
-			df_col = df.columns.tolist()
-			columns = [TableColumn(field=col, title=col, width=75) for col in df_col[0]]
-			columns.extend([TableColumn(field=col, title=col, width=50) for col in df_col[1:-2]])
-			columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-			p1c1_template_table.columns = columns
-			p1c1_template_table.source.data = ColumnDataSource(df).data
+		'''	But also fill the template if samples are already selected! '''
+		if global_dict['p1_current_case'] is not None:
+			# print('\t\t***** NOW WE GONNA REFRESH THIS TABLE \'CAUSE YOLO')
+			refresh_p1_template_preview_table()
 
 def check_if_multiple_donors():
 	pass
 
 
-# def drop_empty_columns_and_adjust_formulae(file_path):
-# 	wb = openpyxl.load_workbook(file_path)
-# 	ws = wb.worksheets[0]
-# 	max_col = ws.max_column
-# 	max_row = ws.max_row
-# 	col_range = range(1,ws.max_column+1)
-# 	'''	Compile list of empty columns '''
-# 	empty_cols = []
-# 	for c in col_range:
-
-# 	wb.save(file_path)
-# 	wb.close()
-
-def on_export_results_click():
+def p1c0_on_export_results_click():
 	# global template_path
 	template_path = global_dict['template_path']
 
@@ -599,38 +569,58 @@ def on_export_results_click():
 			fix_formatting(filename=output_file_name, patient_name=p1c0_enter_host_name.value)
 
 
-def on_select_samples_change(attrname, old, new):
+def p1c0_on_select_samples_change(attrname, old, new):
 	# global p1_current_case
 
 	template_path = global_dict['template_path']
 
 	newest = [c for c in new if c not in old]
 	if len(newest) > 0:
+		'''	Update allele table '''
 		global_dict['p1_current_case'] = newest[0]
-		p1_current_case = global_dict['p1_current_case']
-		df = df_cases[p1_current_case]
-		# print(df)
-		results = build_results_dict(df)
-		# pprint(results)
-		df_filled = build_profile(res=results, sample_name=global_dict['p1_current_case'], template=global_dict['p1_template_df'])
-		global_dict['p1_template_df'] = df_filled.copy(deep=True)
-		if not df_filled.empty:
-			# print(df_filled)
-			df_filled.loc[-1] = ''
-			# print(df_filled)
-			# print(df_filled.index.tolist())
-			df_filled.index = df_filled.index + 1
-			df_filled.sort_index(inplace=True)
+		refresh_p1_template_preview_table()
 
-			col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
-			df_filled.columns = col_letters
-			df_filled = df_filled.fillna('')
-			df_col = df_filled.columns.tolist()
-			columns = [TableColumn(field=col, title=col, width=75) for col in df_col[0]]
-			columns.extend([TableColumn(field=col, title=col, width=50) for col in df_col[1:-2]])
-			columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
-			p1c1_template_table.columns = columns
-			p1c1_template_table.source.data = ColumnDataSource(df_filled).data
+def refresh_p1_template_preview_table():
+	if len(str(global_dict['p1_current_case'])) > 0:
+		p1c1_table_title.text = str(global_dict['p1_current_case'])
+	else:
+		p1c1_table_title.text = '&lt;sample&gt;'
+	p1c1_allele_table.source.data = source_cases[global_dict['p1_current_case']].data
+	p1c1_allele_table.source.selected.indices = source_cases[global_dict['p1_current_case']].selected.indices[:]
+
+	df = df_cases[global_dict['p1_current_case']]
+	# print("df_cases[global_dict['p1_current_case']]")
+	# print(df)
+	results = build_results_dict(df)
+	# pprint(results)
+	df_filled = build_profile(res=results,
+								sample_name=global_dict['p1_current_case'],
+								template=global_dict['p1_template_df'])
+	global_dict['p1_template_df'] = df_filled.copy(deep=True)
+	# print('df_filled')
+	# print(df_filled)
+	if not df_filled.empty:
+		# print(df_filled)
+		df_filled.loc[-1] = ''
+		# print(df_filled)
+		# print(df_filled.index.tolist())
+		df_filled.index = df_filled.index + 1
+		df_filled.sort_index(inplace=True)
+
+		col_letters = [openpyxl.utils.get_column_letter(int(i)+1) for i in df_filled.columns.tolist()]
+		df_filled.columns = col_letters
+		df_filled = df_filled.fillna('')
+		df_col = df_filled.columns.tolist()
+		columns = [TableColumn(field=col, title=col, width=75) for col in df_col[0]]
+		columns.extend([TableColumn(field=col, title=col, width=50) for col in df_col[1:-2]])
+		columns.extend([TableColumn(field=col, title=col, width=250) for col in df_col[-2:]])
+		p1c2_template_table.columns = columns
+		p1c2_template_table.source.data = ColumnDataSource(df_filled).data
+
+
+def p1c1_on_allele_table_edit(attrname, old, new):
+	# print(p1c1_allele_table.source.data)
+	pass
 
 
 results_files = []
@@ -638,23 +628,23 @@ source_cases = {}
 df_cases = {}
 
 pNc0_select_results = Button(label='Add GeneMapper Results', button_type='success')
-pNc0_select_results.on_click(on_results_click)
+pNc0_select_results.on_click(pNc0_on_results_click)
 pNc0_results_text = TextAreaInput(value='<results file>', disabled=True, rows=5)
 
 
 # select_host_case = Select(title='Select Host', options=list(source_cases.keys()))
 p0c0_select_host_case = Select(title='Select Host', options=[])
-p0c0_select_host_case.on_change('value', on_host_click)
+p0c0_select_host_case.on_change('value', p0c0_on_host_click)
 
 
 p0c0_select_donor_cases = MultiSelect(title='Select Donor(s) <ctrl+click to multiselect>',
 								options=[],
 								size=20)
-p0c0_select_donor_cases.on_change('value', on_donor_change)
+p0c0_select_donor_cases.on_change('value', p0c0_on_donor_change)
 
 
 p0c0_export_template = Button(label='Export Template', button_type='warning')
-p0c0_export_template.on_click(on_export_template_click)
+p0c0_export_template.on_click(p0c0_on_export_template_click)
 
 
 p0c0_enter_host_name = TextInput(title='Enter Host Name', value='<type host name here>')
@@ -662,20 +652,27 @@ p1c0_enter_host_name = TextInput(title='Enter Host Name', value='<type host name
 
 
 p1c0_select_template = Button(label='Select Template', button_type='success')
-p1c0_select_template.on_click(on_select_template_click)
+p1c0_select_template.on_click(p1c0_on_select_template_click)
 p1c0_template_text = TextAreaInput(value='<template file>', disabled=True)
 
 
 p1c0_select_samples = MultiSelect(title='Select Sample(s) <ctrl+click to multiselect>',
 									options=[],
 									size=20)
-p1c0_select_samples.on_change('value', on_select_samples_change)
+p1c0_select_samples.on_change('value', p1c0_on_select_samples_change)
 
 p1c0_export_results = Button(label='Export Results To Excel File', button_type='warning')
-p1c0_export_results.on_click(on_export_results_click)
+p1c0_export_results.on_click(p1c0_on_export_results_click)
 
-p0c1_table_title = Div(text='<sample>', sizing_mode='fixed')
+p1c1_table_title = Div(text='&lt;sample&gt;', sizing_mode='fixed')
+
+
+p0c1_table_title = Div(text='&lt;sample&gt;', sizing_mode='fixed')
 p0c2_table_title = Div(text='Template', sizing_mode='fixed')
+p1c2_table_title = Div(text='Template', sizing_mode='fixed')
+
+# p1c2_table_title = Div(text='&lt;sample&gt;', sizing_mode='fixed')
+
 
 columns = [#TableColumn(field='Sample File Name', title='Sample File Name', width=300),
 			TableColumn(field='Marker', title='Marker', width=75),
@@ -684,12 +681,14 @@ columns = [#TableColumn(field='Sample File Name', title='Sample File Name', widt
 
 
 source = ColumnDataSource()
-source.selected.on_change('indices', on_select_alleles_change)
+source.selected.on_change('indices', p0c1_on_select_alleles_change)
 
 p0c1_allele_table = DataTable(columns=columns, source=source, selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300)
 p0c2_template_table = DataTable(source=ColumnDataSource(), fit_columns=True, sizing_mode='stretch_both')
-p1c1_template_table = DataTable(source=ColumnDataSource(), fit_columns=True)
+p1c2_template_table = DataTable(source=ColumnDataSource(), fit_columns=True, editable=True)
 
+p1c1_allele_table = DataTable(columns=columns, source=ColumnDataSource(), selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300, editable=True)
+p1c1_allele_table.source.on_change('data', p1c1_on_allele_table_edit)
 
 p0c0 = column(p0c0_enter_host_name,
 				pNc0_select_results,
@@ -712,11 +711,13 @@ p1c0 = column(p1c0_enter_host_name,
 				p1c0_select_samples,
 				p1c0_export_results)
 
-p1c1 = column(p1c1_template_table, sizing_mode='scale_height')
+p1c1 = column(p1c1_table_title, p1c1_allele_table, sizing_mode='stretch_height')
+
+p1c2 = column(p1c2_table_title, p1c2_template_table, sizing_mode='scale_height')
 
 child_0 = row(p0c0, p0c1, p0c2, sizing_mode='stretch_both')
 # child_0 = row(p0c0, p0c1, p0c2)
-child_1 = row(p1c0, p1c1, sizing_mode='stretch_height')
+child_1 = row(p1c0, p1c1, p1c2, sizing_mode='stretch_height')
 tab1 = Panel(child=child_0, title='Make Template')
 tab2 = Panel(child=child_1, title='Populate Results')
 tabs = Tabs(tabs=[tab1, tab2])

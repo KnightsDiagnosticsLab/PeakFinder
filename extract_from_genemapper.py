@@ -54,15 +54,15 @@ def make_results_dict_from_template(template):
 	ws = replace_cell_values(ws, replacement_dict_no_regex, regex=False)
 	ws = replace_cell_values(ws, replacement_dict_yes_regex, regex=True)
 
-	df = pd.DataFrame(ws.values)
+	# df = pd.DataFrame(ws.values)
 	# print(df)
 	old = True
-	host_cell = cell_with_value(ws, 'ENG Host:')
-	donor_cell = cell_with_value(ws, 'DEG Donor:')
+	host_cell = first_cell_with_value(ws, r'ENG\s+Host', regex=True)
+	donor_cell = first_cell_with_value(ws, r'DEG\s+Donor', regex=True)
 	if host_cell is None:
 		old = False
-		host_cell = cell_with_value(ws, 'Host')
-		donor_cell = cell_with_value(ws, 'Donor')
+		host_cell = first_cell_with_value(ws, 'Host')
+		donor_cell = first_cell_with_value(ws, 'Donor')
 
 	if host_cell is not None and donor_cell is not None:
 
@@ -74,7 +74,7 @@ def make_results_dict_from_template(template):
 			donor_case = str(ws.cell(row=donor_cell.row - 1, column=donor_cell.column).value)
 
 		markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
-		marker_cells = [cell_with_value(ws, marker) for marker in markers if cell_with_value(ws, marker) is not None]
+		marker_cells = [first_cell_with_value(ws, marker) for marker in markers if first_cell_with_value(ws, marker) is not None]
 
 		for marker_cell in marker_cells:
 			marker = str(marker_cell.value)
@@ -377,10 +377,10 @@ def make_template_from_existing_template(template):
 
 
 def build_profile(template, sample_name='', res={}):
-	# print('Now running build_profile_2')
+	# print('Now running build_profile')
 
+	# print(template)
 	# pprint(res)
-	df = pd.DataFrame()
 	if isinstance(template, pd.DataFrame):
 		df = template.copy(deep=True)
 	elif isinstance(template, openpyxl.Workbook):
@@ -396,10 +396,11 @@ def build_profile(template, sample_name='', res={}):
 
 			'''	Insert case number near top '''
 			case_name = re.sub(r'_PTE.*$', '', sample_name)
-			loc = location_of_value(ws, 'Post-T:')
-			if loc is not None:
-				cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
-				cell.value = case_name
+			post_T_cell = first_cell_with_value(ws, r'Post.T', regex=True)
+			if post_T_cell is not None:
+				ws.cell(row=post_T_cell.row, column=post_T_cell.column + 1).value = case_name
+				# cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
+				# cell.value = case_name
 			
 			df = pd.DataFrame(ws.values)
 			wb.close()
@@ -409,7 +410,7 @@ def build_profile(template, sample_name='', res={}):
 
 			df = pd.DataFrame(ws.values)
 	else:
-		return df	# return an empty dataframe
+		return pd.DataFrame()	# return an empty dataframe
 
 	replacement_dict_no_regex = {
 		'THO1': 'TH01',
@@ -438,18 +439,6 @@ def build_profile(template, sample_name='', res={}):
 
 	'''	replace cells that reference other cells with the ref cell's value '''
 	df = replace_cell_ref_with_value(df)
-	# for i, j in allele_ij:
-	# 	locus = str(df.iloc[i, 0])
-	# 	for k in range(1, j):
-	# 		x = str(df.iloc[i, j + k])
-	# 		if x.startswith('='):
-	# 			coor_ws_text = x.replace('=','')
-	# 			coor_ws_num = coordinate_from_string(coor_ws_text)
-	# 			coor_idx = column_index_from_string(coor_ws_num[0]) - 1
-	# 			coor_col = coor_ws_num[1] - 1
-	# 			print('i = {}, j = {}, k = {}, x = {}, coor_ws_text = {}, coor_idx = {}, coor_col = {}'. format(i,j,k,x,coor_ws_text,coor_idx,coor_col))
-	# 			new_val =  df.iloc[coor_idx, coor_col]
-	# 			df.iloc[i, j + k] = df.iloc[coor_idx, coor_col]
 
 	'''	fix the formatting of cells that have a trailing zero '''
 	for i, j in allele_ij:
@@ -465,14 +454,11 @@ def build_profile(template, sample_name='', res={}):
 		locus = str(df.iloc[i, 0])
 		for k in range(1, j):
 			x = str(df.iloc[i, j + k])
-			# if len(x) > 0 and x != pd.np.nan and x != 'NAN':
 			key = (str(sample_name), locus, x)
 			val = res.get(key, pd.np.nan)
 			# print(key, val)
 			df.iat[i + 1, j + k] = res.get(key, pd.np.nan)
 			# print('\tcoor = {}, value = {}'.format(coor, x))
-			# else:
-			# 	df.iat[i + 1, j + k] = pd.np.nan
 
 
 	'''	Drop empty columns. Note that this should only be done after formulae are replaced with values '''
@@ -482,10 +468,6 @@ def build_profile(template, sample_name='', res={}):
 	'''	Get rid of the remaining 'Unnamed: #' column labels '''
 	df.rename(columns=lambda x: re.sub(r'Unnamed.*', '', str(x)), inplace=True)
 
-	'''	TO DO
-		fix circular reference formulae
-		rebuild formulae
-	'''
 	# wb = df_to_wb(df)
 
 	# print(df)

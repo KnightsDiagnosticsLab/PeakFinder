@@ -7,6 +7,7 @@ import random
 import re
 import win32com.client as win32
 import easygui
+import os
 
 def convert_xls_to_xlsx(file_path=None):
 	if file_path is None:
@@ -39,7 +40,6 @@ def df_to_wb(df):
 	wb = openpyxl.Workbook()
 	ws = wb.active
 
-	# print(df)
 	for row_num, row_name in enumerate(df.index.tolist()):
 		for col_num, col_name in enumerate(df.columns.tolist()):
 			ws.cell(row=row_num + 1, column=col_num + 1).value = df.iloc[row_num, col_num]
@@ -48,19 +48,21 @@ def df_to_wb(df):
 
 
 def use_csv_module(filename):
-	with open(filename, newline='') as csvfile:
-		dialect = csv.Sniffer().sniff(csvfile.read(1024))
-		csvfile.seek(0)
-		reader = csv.reader(csvfile, dialect)
-		l = [r for r in reader]
-	headers = l.pop(0)
-	df = pd.DataFrame(l, columns=headers)
-	df.replace(r'^\s*$', pd.np.nan, regex=True, inplace=True)
-	# print(df)
+	df = pd.DataFrame()
+	if os.path.isfile(filename):
+		with open(filename, newline='') as csvfile:
+			dialect = csv.Sniffer().sniff(csvfile.read(1024))
+			csvfile.seek(0)
+			reader = csv.reader(csvfile, dialect)
+			l = [r for r in reader]
+		headers = l.pop(0)
+		df = pd.DataFrame(l, columns=headers)
+		df.replace(r'^\s*$', pd.np.nan, regex=True, inplace=True)
+		# print(df)
 	return df
 
 
-def fix_formatting(filename, patient_name='', case_name=None):
+def fix_formatting(filename, patient_name='', case_name=''):
 	''' Helper function '''
 	def border_add(border, top=None, right=None, left=None, bottom=None):
 		if top is None:
@@ -140,11 +142,18 @@ def fix_formatting(filename, patient_name='', case_name=None):
 		cell.border = border_add(cell.border, right=medium)
 
 	''' Add in case_name '''
-	if case_name is not None:
-		loc = location_of_value(ws, 'Post-T:')
-		if loc is not None:
-			cell = ws[chr(ord(loc[0]) + 1) + str(loc[1])]
-			cell.value = case_name
+	loc = location_of_value(ws, 'Post-T:')
+	post_T_cell = first_cell_with_value(ws, 'Post-T:')
+	if post_T_cell is not None:
+		r = post_T_cell.row
+		c = post_T_cell.column
+		ws.cell(row=r, column=c+1).value = case_name
+	else:
+		allele_cell = first_cell_with_value(ws, 'Allele')
+		r = allele_cell.row
+		c = allele_cell.column
+		ws.cell(row=r-1, column=c+1).value = 'Post-T:'
+		ws.cell(row=r-1, column=c+2).value = case_name
 
 	ws.sheet_view.view = 'pageLayout'
 	openpyxl.worksheet.worksheet.Worksheet.set_printer_settings(
@@ -169,7 +178,7 @@ def replace_cell_values(ws, replacement_dict, regex=False):
 			cell = ws.cell(row=r, column=c)
 			for old, new in replacement_dict.items():
 				if regex:
-					if re.fullmatch(old, str(cell.value), flags=re.IGNORECASE) is not None:
+					if re.fullmatch(old, str(cell.value), flags=re.IGNORECASE):
 						cell.value = new
 				elif cell.value == old:
 					cell.value = new
@@ -197,11 +206,14 @@ def idx_of_value(ws, val):
 	return idx
 
 
-def cell_with_value(ws, val):
+def first_cell_with_value(ws, val, regex=False):
 	for r in range(1, ws.max_row + 1):
 		for c in range(1, ws.max_column + 1):
 			cell = ws.cell(row=r, column=c)
-			if cell.value == val:
+			if regex:
+				if re.search(val, str(cell.value), flags=re.IGNORECASE):
+					return cell
+			elif cell.value == val:
 				return cell
 	return None
 
@@ -248,13 +260,6 @@ def replace_cell_ref_with_value(df):
 
 def build_results_dict(df=None):
 	peaks = {}
-
-	# if not isinstance(df, pd.DataFrame):
-	# 	filename = easygui.fileopenbox(
-	# 		msg='Select results file')
-	# 	if filename is None:
-	# 		exit()
-	# 	df = use_csv_module(filename)
 
 	if isinstance(df, pd.DataFrame):
 		df = df[['Sample File Name', 'Marker', 'Allele', 'Area']]
