@@ -200,13 +200,9 @@ def convert_folder(dir_path=None, channels_only=True):
 	root = tk.Tk()
 	root.withdraw()		# hide the root tk window
 
-	if dir_path == None:
+	if dir_path is None:
 		# dir_path = easygui.diropenbox()
-		dir_path = askdirectory(filetypes = (('Fragment Size Analysis', '*.fsa'),
-											('Comma Separated Values','*.csv'),
-										),
-								title = 'Choose folder of FSA files.'
-								)
+		dir_path = askdirectory(title = 'Choose folder of FSA files.')
 	root.destroy()		# kill the root tk window
 
 	abs_path_dir = os.path.abspath(dir_path)
@@ -235,33 +231,35 @@ def convert_folder(dir_path=None, channels_only=True):
 			results.to_csv(outfile_path, index=False, header=True)
 	return outfile_paths
 
+
 def main():
-	myargs = create_parser()
-	input_dir = myargs.input[0]
+	convert_folder()
+	# myargs = create_parser()
+	# input_dir = myargs.input[0]
 
-	abs_path_dir = os.path.abspath(input_dir)
-	files = find_3130_files(abs_path_dir)
+	# abs_path_dir = os.path.abspath(input_dir)
+	# files = find_3130_files(abs_path_dir)
 
-	print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
+	# print('Found {} fsa files. Beginning conversion to csv'.format(len(files)))
 
-	for input_file in files:
-		abs_input_file = os.path.abspath(input_file)
-		outfile_path = abs_input_file.split('.')[0] + '.csv'
+	# for input_file in files:
+	# 	abs_input_file = os.path.abspath(input_file)
+	# 	outfile_path = abs_input_file.split('.')[0] + '.csv'
 
-		record = SeqIO.read(abs_input_file, 'abi')
-		keys = record.annotations['abif_raw'].keys()
+	# 	record = SeqIO.read(abs_input_file, 'abi')
+	# 	keys = record.annotations['abif_raw'].keys()
 
-		data = create_dataframe(record, keys)
-		metadata = metadata_dataframe(record, keys)
+	# 	data = create_dataframe(record, keys)
+	# 	metadata = metadata_dataframe(record, keys)
 
-		results = pd.concat([data, metadata], axis=1)
-		del results['index']
+	# 	results = pd.concat([data, metadata], axis=1)
+	# 	del results['index']
 
-		if myargs.channels_only:
-			results = results.iloc[:,0:4]
-			results.to_csv(outfile_path, index=False, header=True)
-		else:
-			results.to_csv(outfile_path, index=False, header=True)
+	# 	if myargs.channels_only:
+	# 		results = results.iloc[:,0:4]
+	# 		results.to_csv(outfile_path, index=False, header=True)
+	# 	else:
+	# 		results.to_csv(outfile_path, index=False, header=True)
 
 
 if __name__ == '__main__':
