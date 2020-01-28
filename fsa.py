@@ -262,23 +262,24 @@ def build_results_dict(df=None):
 	peaks = {}
 
 	if isinstance(df, pd.DataFrame):
-		df = df[['Sample File Name', 'Marker', 'Allele', 'Area']]
+		if not df.empty:		# this way if it's empty it'll just return peaks = {}
+			df = df[['Sample File Name', 'Marker', 'Allele', 'Area']]
 
-		'''	Get rid of peaks that aren't assigned an allele '''
-		df = df.dropna(axis=0, how='any', inplace=False)
+			'''	Get rid of peaks that aren't assigned an allele '''
+			df = df.dropna(axis=0, how='any', inplace=False)
 
-		'''	Get rid of OL (off ladder) peaks '''
-		df = df[df['Allele'] != 'OL']
-		df = df.reset_index(drop=True, inplace=False)
+			'''	Get rid of OL (off ladder) peaks '''
+			df = df[df['Allele'] != 'OL']
+			df = df.reset_index(drop=True, inplace=False)
 
-		fnames = set()
-		for i in df.index:
-			file_name = str(df.iloc[i]['Sample File Name'])
-			fnames.add(file_name)
-			locus = str(df.iloc[i]['Marker'])
-			allele = str(df.iloc[i]['Allele'])
-			key = (file_name, locus, allele)
-			peaks[key] = peaks.get(key, 0) + int(df.iloc[i]['Area'])
+			fnames = set()
+			for i in df.index:
+				file_name = str(df.iloc[i]['Sample File Name'])
+				fnames.add(file_name)
+				locus = str(df.iloc[i]['Marker'])
+				allele = str(df.iloc[i]['Allele'])
+				key = (file_name, locus, allele)
+				peaks[key] = peaks.get(key, 0) + int(df.iloc[i]['Area'])
 	# for k,v in peaks.items():
 	# 	print(k,v)
 	return peaks

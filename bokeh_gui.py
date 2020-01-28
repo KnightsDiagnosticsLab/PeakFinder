@@ -24,6 +24,7 @@ pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 50)
 
 global_dict = {
+	'results_files': [],
 	'template_path': None,
 	'p0_template_path': None,
 	'p1_template_path': None,
@@ -100,7 +101,7 @@ def p0c0_on_host_click(attrname, old, new):
 
 
 def pNc0_on_results_click():
-	global source_cases, results_files, df, p0c1_allele_table, df_cases
+	global source_cases, df, p0c1_allele_table, df_cases
 
 	root = tk.Tk()
 	root.attributes("-topmost", True)
@@ -113,9 +114,9 @@ def pNc0_on_results_click():
 								initialdir=r'X:\Hospital\Genetics Lab\DNA_Lab\3-Oncology Tests\Engraftment\ABI PTE Runs'
 							)
 	root.destroy()
-	if basename(file_path) not in results_files:
-		results_files.append(basename(file_path))
-		pNc0_results_text.value = '\n'.join(results_files)
+	if basename(file_path) is not None and basename(file_path) != '' and basename(file_path) not in global_dict['results_files']:
+		global_dict['results_files'].append(basename(file_path))
+		pNc0_results_text.value = '\n'.join(global_dict['results_files'])
 
 		df_new = use_csv_module(file_path)
 		if not df_new.empty:
@@ -138,7 +139,7 @@ def pNc0_on_results_click():
 			p0c0_select_donor_cases.options = list(source_cases.keys())
 			p1c0_select_samples.options = list(source_cases.keys())
 
-	if len(results_files) == 1:
+	if len(global_dict['results_files']) == 1:
 		p0c0_select_host_case.value = list(source_cases.keys())[0]
 
 
@@ -518,9 +519,9 @@ def p1c0_on_select_template_click():
 		df = pd.DataFrame(wb.worksheets[0].values)
 		global_dict['p1_template_df'] = df.copy(deep=True)
 		'''	But also fill the template if samples are already selected! '''
-		if global_dict['p1_current_case'] is not None:
+		# if global_dict['p1_current_case'] is not None:
 			# print('\t\t***** NOW WE GONNA REFRESH THIS TABLE \'CAUSE YOLO')
-			refresh_p1_template_preview_table()
+		refresh_p1_template_preview_table()
 
 def check_if_multiple_donors():
 	pass
@@ -585,10 +586,13 @@ def refresh_p1_template_preview_table():
 		p1c1_table_title.text = str(global_dict['p1_current_case'])
 	else:
 		p1c1_table_title.text = '&lt;sample&gt;'
-	p1c1_allele_table.source.data = source_cases[global_dict['p1_current_case']].data
-	p1c1_allele_table.source.selected.indices = source_cases[global_dict['p1_current_case']].selected.indices[:]
+	source = source_cases.get('p1_current_case',ColumnDataSource())
+	# p1c1_allele_table.source.data = source_cases[global_dict['p1_current_case']].data
+	p1c1_allele_table.source.data = source.data
+	# p1c1_allele_table.source.selected.indices = source_cases[global_dict['p1_current_case']].selected.indices[:]
+	p1c1_allele_table.source.selected.indices = source.selected.indices[:]
 
-	df = df_cases[global_dict['p1_current_case']]
+	df = df_cases.get(global_dict['p1_current_case'],pd.DataFrame())
 	# print("df_cases[global_dict['p1_current_case']]")
 	# print(df)
 	results = build_results_dict(df)
@@ -623,7 +627,7 @@ def p1c1_on_allele_table_edit(attrname, old, new):
 	pass
 
 
-results_files = []
+# results_files = []
 source_cases = {}
 df_cases = {}
 
