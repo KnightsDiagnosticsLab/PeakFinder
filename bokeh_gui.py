@@ -579,9 +579,10 @@ def p1c0_on_select_samples_change(attrname, old, new):
 	if len(newest) > 0:
 		'''	Update allele table '''
 		global_dict['p1_current_case'] = newest[0]
+		refresh_p1_allele_table()
 		refresh_p1_template_preview_table()
 
-def refresh_p1_template_preview_table():
+def refresh_p1_allele_table():
 	if len(str(global_dict['p1_current_case'])) > 0:
 		p1c1_table_title.text = str(global_dict['p1_current_case'])
 	else:
@@ -627,7 +628,6 @@ def p1c1_on_allele_table_edit(attrname, old, new):
 	pass
 
 
-# results_files = []
 source_cases = {}
 df_cases = {}
 

@@ -510,10 +510,11 @@ def fill_template_with_areas(template, sample_name='', res={}):
 		ws.cell(row=r, column=c+1).value = sample_case_abbrev
 	else:
 		allele_cell = first_cell_with_value(ws, 'Allele')
-		r = allele_cell.row
-		c = allele_cell.column
-		ws.cell(row=r-2, column=c+1).value = 'Post-T:'
-		ws.cell(row=r-2, column=c+2).value = sample_case_abbrev
+		if allele_cell is not None:
+			r = allele_cell.row
+			c = allele_cell.column
+			ws.cell(row=r-2, column=c+1).value = 'Post-T:'
+			ws.cell(row=r-2, column=c+2).value = sample_case_abbrev
 	df = pd.DataFrame(ws.values)
 	# print(df)
 	return df
