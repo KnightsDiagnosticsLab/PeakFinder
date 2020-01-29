@@ -505,7 +505,7 @@ def p1c0_on_select_template_click():
 		global_dict['template_path'] = file_path
 		# global template_path
 		# template_path = file_path
-		# df = build_profile_2(template=global_dict['template_path'])
+		# df = fill_template_with_areas_2(template=global_dict['template_path'])
 		# makeshift_results_dictionary(template=global_dict['template_path'])
 		wb = make_template_from_existing_template(template=global_dict['template_path'])
 		patient_name = get_patient_name_from_header(global_dict['template_path'])
@@ -559,7 +559,7 @@ def p1c0_on_export_results_click():
 			# print(df)
 			results = build_results_dict(df)
 			# print(results)
-			df_filled = build_profile(res=results, sample_name=sample, template=global_dict['p1_template_df'])
+			df_filled = fill_template_with_areas(res=results, sample_name=sample, template=global_dict['p1_template_df'])
 			# global_dict['p1_template_df'] = df_filled.copy(deep=True)
 			# print(df_filled)
 
@@ -601,7 +601,7 @@ def refresh_p1_template_preview_table():
 	# print(df)
 	results = build_results_dict(df)
 	# pprint(results)
-	df_filled = build_profile(res=results,
+	df_filled = fill_template_with_areas(res=results,
 								sample_name=global_dict['p1_current_case'],
 								template=global_dict['p1_template_df'])
 	global_dict['p1_template_df'] = df_filled.copy(deep=True)

@@ -141,20 +141,6 @@ def fix_formatting(filename, patient_name='', case_name=''):
 		cell = ws[ascii_uppercase[2 * j] + str(i + 3)]
 		cell.border = border_add(cell.border, right=medium)
 
-	''' Add in case_name '''
-	loc = location_of_value(ws, 'Post-T:')
-	post_T_cell = first_cell_with_value(ws, 'Post-T:')
-	if post_T_cell is not None:
-		r = post_T_cell.row
-		c = post_T_cell.column
-		ws.cell(row=r, column=c+1).value = case_name
-	else:
-		allele_cell = first_cell_with_value(ws, 'Allele')
-		r = allele_cell.row
-		c = allele_cell.column
-		ws.cell(row=r-1, column=c+1).value = 'Post-T:'
-		ws.cell(row=r-1, column=c+2).value = case_name
-
 	ws.sheet_view.view = 'pageLayout'
 	openpyxl.worksheet.worksheet.Worksheet.set_printer_settings(
 		ws, paper_size=1, orientation='landscape')
@@ -204,6 +190,19 @@ def idx_of_value(ws, val):
 				idx = [cell.column, cell.row]
 				return idx
 	return idx
+
+
+def all_cells_with_value(ws, val, regex=False):
+	cells = []
+	for r in range(1, ws.max_row + 1):
+		for c in range(1, ws.max_column + 1):
+			cell = ws.cell(row=r, column=c)
+			if regex:
+				if re.search(val, str(cell.value), flags=re.IGNORECASE):
+					cells.append(cell)
+			elif cell.value == val:
+				cells.append(cell)
+	return cells
 
 
 def first_cell_with_value(ws, val, regex=False):
