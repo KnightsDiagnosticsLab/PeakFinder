@@ -579,18 +579,22 @@ def p1c0_on_select_samples_change(attrname, old, new):
 	if len(newest) > 0:
 		'''	Update allele table '''
 		global_dict['p1_current_case'] = newest[0]
+		refresh_p1_allele_table()
 		refresh_p1_template_preview_table()
 
-def refresh_p1_template_preview_table():
+def refresh_p1_allele_table():
 	if len(str(global_dict['p1_current_case'])) > 0:
 		p1c1_table_title.text = str(global_dict['p1_current_case'])
 	else:
 		p1c1_table_title.text = '&lt;sample&gt;'
 	source = source_cases.get('p1_current_case',ColumnDataSource())
-	# p1c1_allele_table.source.data = source_cases[global_dict['p1_current_case']].data
-	p1c1_allele_table.source.data = source.data
-	# p1c1_allele_table.source.selected.indices = source_cases[global_dict['p1_current_case']].selected.indices[:]
-	p1c1_allele_table.source.selected.indices = source.selected.indices[:]
+	p1c1_allele_table.source.data = source_cases[global_dict['p1_current_case']].data
+	# p1c1_allele_table.source.data = source.data
+	p1c1_allele_table.source.selected.indices = source_cases[global_dict['p1_current_case']].selected.indices[:]
+	# p1c1_allele_table.source.selected.indices = source.selected.indices[:]
+
+
+def refresh_p1_template_preview_table():
 
 	df = df_cases.get(global_dict['p1_current_case'],pd.DataFrame())
 	# print("df_cases[global_dict['p1_current_case']]")
