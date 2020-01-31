@@ -40,13 +40,12 @@ def bkapp(curdoc):
 		'p1_donors':[],
 	}
 
-
 	def reduce_rows(df):
-		print(df)
+		# print(df)
 		df = df.dropna(axis=1, how='all')
 		cols = ['Sample File Name', 'Marker','Allele', 'Area']
-		print('********************************************')
-		print(df)
+		# print('********************************************')
+		# print(df)
 		df = df.dropna(axis=0, how='any', subset=cols)
 		df = df.sort_values(by=cols, ascending=True)
 		type_dict = {'Area':'int',
