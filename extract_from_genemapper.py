@@ -19,6 +19,308 @@ pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 50)
 
+def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}, host_name=''):
+
+	''' Helper function '''
+	def string_to_number(s):
+		try:
+			s = float(s)
+		except:
+			pass
+		return s
+
+	''' Helper function '''
+	def format_value(cell_value):
+		if cell_value is not None:
+			cell_value_formatted = str(cell_value).replace('.0', '')
+		else:
+			cell_value_formatted = None
+		return cell_value_formatted
+
+
+	markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
+	# host_case = host_case
+	df_host = df_cases.get(host_case, pd.DataFrame())
+	df_host = df_host.loc[df_host['Selected'] == True]
+	# print('df_host')
+	# print(df_host)
+
+	# donor_cases = donor_cases.value
+	donors = {}
+	for donor_case in donor_cases:
+		df_donor = df_cases[donor_case]
+		df_donor = df_donor.loc[df_donor['Selected'] == True]
+		donors[donor_case] = df_donor.copy(deep=True)
+
+	wb = openpyxl.Workbook()
+	ws = wb.active
+	'''	Header, etc.
+	'''
+	ws.oddHeader.center.text = host_name
+	# ws.oddHeader.center.size = 14
+	ws.cell(row=2, column=1, value='Marker')
+	ws.cell(row=2, column=2, value='Host')
+	host_case_abbrev = re.sub(r'_PTE.*$', '', host_case)
+	ws.cell(row=1, column=2, value=host_case_abbrev)
+	for i, donor_case in enumerate(donor_cases):
+		donor_case_abbrev = re.sub(r'_PTE.*$', '', donor_case)
+		c = 4 + 2*i
+		ws.cell(row=1, column=c, value=donor_case_abbrev)
+		if len(donor_cases) == 1:
+			donor_num = 'Donor'
+		else:
+			donor_num = 'Donor ' + str(i+1)
+		ws.cell(row=2, column=c, value=donor_num)
+
+	'''	Markers & Alleles
+	'''
+	for i, marker in enumerate(markers):
+		r = 1+(i+1)*2
+		df_marker = df_host.loc[df_host['Marker'] == marker]
+		ws.cell(row=r, column=1, value=marker)
+		# print(df_marker)
+		for j, allele in enumerate(df_marker['Allele']):
+			# print(marker, j, allele)
+			allele = string_to_number(allele)
+			c = j+2
+			ws.cell(row=r, column=c, value=allele)
+		
+		for j, donor in enumerate(donors.keys()):
+			df_donor = donors[donor]
+			df_marker = df_donor.loc[df_donor['Marker'] == marker]
+			for k, allele in enumerate(df_marker['Allele']):
+				allele = string_to_number(allele)
+				c = (4 + 2*j) + k
+				ws.cell(row=r, column=c, value=allele)
+
+	''' Add in column of Allele/Area
+	'''
+	caa = 2*len(donors.keys()) + 4
+	for i, marker in enumerate(markers):
+		r1 = 1+(i+1)*2
+		r2 = r1 + 1
+		ws.cell(row=r1, column=caa, value='Allele')
+		ws.cell(row=r2, column=caa, value='Area')
+
+	''' Copy columns
+	'''
+	for i in range(2,caa,2):
+		for r in range(2,ws.max_row + 1):
+			c1 = 2*caa - (i+1)
+			c2 = c1 + 1
+			ws.cell(row=r, column=c1, value=ws.cell(row=r, column=i).value)
+			ws.cell(row=r, column=c2, value=ws.cell(row=r, column=i+1).value)
+
+	'''	Add in % Host & Forumula columns
+	'''
+	ws.cell(row=2, column=2*caa - 1, value='% Host')
+	ws.cell(row=2, column=2*caa, value='Formula')
+	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Host')
+	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Donor')
+
+	'''
+	*************************************************
+	THIS IS WHERE WE NEED TO MAKE EDITS FOR 2+ DONORS
+	*************************************************
+	'''
+	if len(donor_cases) == 1:
+
+		'''	Add the actual formulae. For now only if there's one donor, because
+			I haven't been given a cheatsheet for 2+ donors.
+		'''
+		percent_host_col = 2*caa - 1		# col num where formula goes. Actual Excel formula, not the text version.
+		d1_col = percent_host_col - 4		# col num for donor allele 1
+		d2_col = percent_host_col - 3		# col num for donor allele 2
+		h1_col = percent_host_col - 2		# col num for host allele 1
+		h2_col = percent_host_col - 1		# col num for host allele 2
+		for r2 in range(4, 4+2*len(markers), 2):
+			r1 = r2 - 1
+
+			d1_alle = ws.cell(row=r1, column=d1_col)
+			d2_alle = ws.cell(row=r1, column=d2_col)
+			h1_alle = ws.cell(row=r1, column=h1_col)
+			h2_alle = ws.cell(row=r1, column=h2_col)
+
+			d1_alle_val = format_value(d1_alle.value)
+			d2_alle_val = format_value(d2_alle.value)
+			h1_alle_val = format_value(h1_alle.value)
+			h2_alle_val = format_value(h2_alle.value)
+
+			d1_area = ws.cell(row=r2, column=d1_col)
+			d2_area = ws.cell(row=r2, column=d2_col)
+			h1_area = ws.cell(row=r2, column=h1_col)
+			h2_area = ws.cell(row=r2, column=h2_col)
+
+			f1 = ws.cell(row=r1, column=percent_host_col+1)
+			f1.alignment = Alignment(horizontal='center')
+			f2 = ws.cell(row=r2, column=percent_host_col+1)
+			f2.alignment = Alignment(horizontal='left')
+
+			d = {d1_alle_val, d2_alle_val}
+			d.discard(None)
+			h = {h1_alle_val, h2_alle_val}
+			h.discard(None)
+
+			percent_host = ws.cell(row=r2, column=percent_host_col)
+
+			# print('d = {}, h = {}'.format(d,h))
+
+			if len(d | h) == 4:
+				f1.value = '{} + {}'.format(h1_alle_val,
+											h2_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {} + {} + {}'.format(h1_alle_val,
+														h2_alle_val,
+														d1_alle_val,
+														d2_alle_val)
+
+				percent_host.value = '=100*SUM({}:{})/SUM({},{},{},{})'.format(h1_area.coordinate,
+																	h2_area.coordinate,
+																	d1_area.coordinate,
+																	d2_area.coordinate,
+																	h1_area.coordinate,
+																	h2_area.coordinate)
+
+			if len(h) == 1 and len(h | d) == 3:
+				f1.value = '{}'.format(h1_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {} + {}'.format(h1_alle_val,
+												d1_alle_val,
+												d2_alle_val)
+
+				percent_host.value = '=100*{}/SUM({},{},{})'.format(h1_area.coordinate,
+															d1_area.coordinate,
+															d2_area.coordinate,
+															h1_area.coordinate)
+
+			if len(d) == 1 and len( h | d) == 3:
+				f1.value = '{} + {}'.format(h1_alle_val,
+											h2_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {} + {}'.format(h1_alle_val,
+												h2_alle_val,
+												d1_alle_val)
+
+				percent_host.value = '=100*SUM({}:{})/SUM({},{},{})'.format(h1_area.coordinate,
+																	h2_area.coordinate,
+																	d1_area.coordinate,
+																	h1_area.coordinate,
+																	h2_area.coordinate)
+
+			if len(h) == 1 and len(d) == 1 and len(h | d) == 2:
+				f1.value = '{}'.format(h1_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {}'.format(h1_alle_val,
+											d1_alle_val)
+				f2.alignment = Alignment(horizontal='center')
+
+				percent_host = '={}/SUM({},{})'.format(h1_area.coordinate,
+													d1_area.coordinate,
+													h1_area.coordinate)
+
+			if len(h) == 2 and len(d) == 2 and len(h | d) == 3:
+				if h1_alle_val not in d:
+					h_unique_alle_val = h1_alle_val
+					h_unique_area = h1_area
+				else:
+					h_unique_alle_val = h2_alle_val
+					h_unique_area = h2_area
+
+				if d1_alle_val not in h:
+					d_unique_alle_val = d1_alle_val
+					d_unique_area = d1_area
+				else:
+					d_unique_alle_val = d2_alle_val
+					d_unique_area = d2_area
+
+				f1.value = '{}'.format(h_unique_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {}'.format(h_unique_alle_val,
+											d_unique_alle_val)
+				f2.alignment = Alignment(horizontal='center')
+
+				percent_host.value = '=100*{}/SUM({},{})'.format(h_unique_area.coordinate,
+													d_unique_area.coordinate,
+													h_unique_area.coordinate)
+
+			if len(h) == 1 and len(d) == 2 and len(h | d) == 2:
+				if d1_alle_val in h:
+					A_alle_val = d2_alle_val
+					A_area = d2_area
+				else:
+					A_alle_val = d1_alle_val
+					A_area = d1_area
+
+				if h1_alle_val in d:
+					H_alle_val = h1_alle_val
+					H_area = h1_area
+				else:
+					H_alle_val = h2_alle_val
+					H_area = h2_area
+
+				f2.value = '1 - (2x{}/({} + {}))'.format(A_alle_val,
+														A_alle_val,
+														H_alle_val)
+
+				percent_host.value = '=100*(1-(2*{}/({}+{})))'.format(A_area.coordinate,
+																	A_area.coordinate,
+																	H_area.coordinate)
+			
+			if len(h) == 2 and len(d) == 1 and len(h | d) == 2:
+				if h1_alle_val in d:
+					A_alle_val = h2_alle_val
+					A_area = h2_area
+				else:
+					A_alle_val = h1_alle_val
+					A_area = h1_area
+
+				if d1_alle_val in h:
+					D_alle_val = d1_alle_val
+					D_area = d1_area
+				else:
+					D_alle_val = d2_alle_val
+					D_area = d2_area
+
+				f1.value = '2x{}'.format(A_alle_val)
+				f1.alignment = Alignment(horizontal='center')
+
+				f2.value = '{} + {}'.format(A_alle_val,
+											D_alle_val)
+				f2.alignment = Alignment(horizontal='center')
+
+				percent_host.value = '=100*(2*{})/({}+{})'.format(A_area.coordinate,
+																	A_area.coordinate,
+																	D_area.coordinate)
+
+		'''	Formula for average of Percent Host column
+		'''
+		percent_host_avg = ws.cell(row=3+2*len(markers), column=percent_host_col)
+		start = ws.cell(row=3, column=percent_host_col)
+		end = ws.cell(row=2+2*len(markers), column=percent_host_col)
+		percent_host_avg.value = '=AVERAGE({}:{})'.format(start.coordinate, end.coordinate)
+
+		percent_donor_avg = ws.cell(row=4+2*len(markers), column=percent_host_col)
+		percent_donor_avg.value = '=100-{}'.format(percent_host_avg.coordinate)
+
+
+	if file_path is not None:
+		if file_path.endswith('.xlsx'):
+			'''	Save the file before running fix_formatting '''
+			wb.save(file_path)
+			wb.close()
+
+			'''	Fix formatting '''
+			fix_formatting(file_path)
+			print('Done saving {}'.format(file_path))
+
+	wb.close()
+
+	return wb
 
 def make_results_dict_from_template(template):
 	# print('Now inside makeshift_results_dictionary')
@@ -141,6 +443,10 @@ def copy_paste_bottom_few_rows(ws_old, ws_new):
 
 
 def make_template_from_existing_template(template):
+	''' *********************************************
+		THIS IS THE OTHER PLACE TO EDIT FOR 2+ DONORS
+		*********************************************
+	'''
 
 	''' Helper function '''
 	def string_to_number(s):
@@ -421,7 +727,7 @@ def make_template_from_existing_template(template):
 	return wb
 
 
-def fill_template_with_areas(template, sample_name='', res={}):
+def fill_template_with_areas(template=None, sample_name='', res={}):
 	# print('Now running build_profile')
 	# print(template)
 	# pprint(res)
@@ -518,49 +824,6 @@ def fill_template_with_areas(template, sample_name='', res={}):
 	df = pd.DataFrame(ws.values)
 	# print(df)
 	return df
-
-
-def insert_formulae(filename, template):
-	if template.endswith('.xls'):
-		excel = win32.gencache.EnsureDispatch('Excel.Application')
-		wb = excel.Workbooks.Open(template)
-
-		template = template + 'x'
-		# FileFormat = 51 is for .xlsx extension
-		wb.SaveAs(template, FileFormat=51)
-		wb.Close()  # FileFormat = 56 is for .xls extension
-		excel.Application.Quit()
-	assert template.endswith('.xlsx')
-	wbt = openpyxl.load_workbook(template)
-	wst = wbt.worksheets[0]
-
-	# find cell with '% Host'
-	host_loc_t = location_of_value(wst, '% Host')
-	formula_dict = {}
-
-	for i in range(host_loc_t[1] + 1, wst.max_row + 1):
-		cell1 = wst['A' + str(i)]
-		cell2 = wst[host_loc_t[0] + str(i)]
-		# print(cell1.value, cell2.value)
-		formula_dict[cell1.value] = cell2.value
-	formula_dict.pop(None)
-
-	''' open outputfile and insert formulae
-	'''
-	wb = openpyxl.load_workbook(filename)
-	ws = wb.worksheets[0]
-
-	host_loc = location_of_value(ws, '% Host')
-
-	for i in range(host_loc[1] + 1, wst.max_row + 1):
-		cell1 = ws['A' + str(i)]
-		cell2 = ws[host_loc[0] + str(i)]
-		# print(cell1.value, cell2.value)
-		cell2.value = formula_dict.get(cell1.value, cell2.value)
-		# print(cell1.value, cell2.value)
-		# print('')
-	wb.save(filename)
-	wb.close()
 
 
 # def main():
