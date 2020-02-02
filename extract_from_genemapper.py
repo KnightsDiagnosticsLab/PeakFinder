@@ -19,24 +19,26 @@ pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 50)
 
+
+''' Helper function '''
+def string_to_number(s):
+	try:
+		s = float(s)
+	except:
+		pass
+	return s
+
+
+''' Helper function '''
+def format_value(cell_value):
+	if cell_value is not None:
+		cell_value_formatted = str(cell_value).replace('.0', '')
+	else:
+		cell_value_formatted = None
+	return cell_value_formatted
+
+
 def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}, host_name=''):
-
-	''' Helper function '''
-	def string_to_number(s):
-		try:
-			s = float(s)
-		except:
-			pass
-		return s
-
-	''' Helper function '''
-	def format_value(cell_value):
-		if cell_value is not None:
-			cell_value_formatted = str(cell_value).replace('.0', '')
-		else:
-			cell_value_formatted = None
-		return cell_value_formatted
-
 
 	markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
 	# host_case = host_case
@@ -54,8 +56,8 @@ def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}
 
 	wb = openpyxl.Workbook()
 	ws = wb.active
-	'''	Header, etc.
-	'''
+
+	'''	Header, etc. '''
 	ws.oddHeader.center.text = host_name
 	# ws.oddHeader.center.size = 14
 	ws.cell(row=2, column=1, value='Marker')
@@ -72,8 +74,7 @@ def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}
 			donor_num = 'Donor ' + str(i+1)
 		ws.cell(row=2, column=c, value=donor_num)
 
-	'''	Markers & Alleles
-	'''
+	'''	Markers & Alleles '''
 	for i, marker in enumerate(markers):
 		r = 1+(i+1)*2
 		df_marker = df_host.loc[df_host['Marker'] == marker]
@@ -93,8 +94,7 @@ def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}
 				c = (4 + 2*j) + k
 				ws.cell(row=r, column=c, value=allele)
 
-	''' Add in column of Allele/Area
-	'''
+	''' Add in column of Allele/Area '''
 	caa = 2*len(donors.keys()) + 4
 	for i, marker in enumerate(markers):
 		r1 = 1+(i+1)*2
@@ -102,8 +102,7 @@ def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}
 		ws.cell(row=r1, column=caa, value='Allele')
 		ws.cell(row=r2, column=caa, value='Area')
 
-	''' Copy columns
-	'''
+	''' Copy columns '''
 	for i in range(2,caa,2):
 		for r in range(2,ws.max_row + 1):
 			c1 = 2*caa - (i+1)
@@ -111,18 +110,43 @@ def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}
 			ws.cell(row=r, column=c1, value=ws.cell(row=r, column=i).value)
 			ws.cell(row=r, column=c2, value=ws.cell(row=r, column=i+1).value)
 
-	'''	Add in % Host & Forumula columns
-	'''
+	'''	Add in % Host & Forumula columns '''
 	ws.cell(row=2, column=2*caa - 1, value='% Host')
 	ws.cell(row=2, column=2*caa, value='Formula')
 	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Host')
 	ws.cell(row=ws.max_row+1, column=2*caa-2, value='%Donor')
 
+	wb = insert_equations(wb=wb, file_path=file_path, host_case=host_case, donor_cases=donor_cases, df_cases=df_cases, host_name=host_name)
+
+	if file_path is not None:
+		if file_path.endswith('.xlsx'):
+			'''	Save the file before running fix_formatting '''
+			wb.save(file_path)
+			wb.close()
+
+			'''	Fix formatting '''
+			fix_formatting(file_path)
+			print('Done saving {}'.format(file_path))
+
+	wb.close()
+
+	return wb
+
+def insert_equations(wb=None, file_path=None, host_case=None, donor_cases=[], df_cases={}, host_name=''):
 	'''
 	*************************************************
 	THIS IS WHERE WE NEED TO MAKE EDITS FOR 2+ DONORS
 	*************************************************
 	'''
+	markers = ['D8S1179', 'D21S11', 'D7S820', 'CSF1PO', 'D3S1358', 'TH01', 'D13S317', 'D16S539', 'D2S1338', 'D19S433', 'vWA', 'TPOX', 'D18S51', 'AMEL', 'D5S818', 'FGA']
+
+	ws = wb.active
+
+	allele_cell = first_cell_with_value(ws, 'Allele')
+
+	caa = allele_cell.column
+	raa = allele_cell.row
+
 	if len(donor_cases) == 1:
 
 		'''	Add the actual formulae. For now only if there's one donor, because
@@ -299,26 +323,13 @@ def make_template_wb(file_path=None, host_case=None, donor_cases=[], df_cases={}
 
 		'''	Formula for average of Percent Host column
 		'''
-		percent_host_avg = ws.cell(row=3+2*len(markers), column=percent_host_col)
-		start = ws.cell(row=3, column=percent_host_col)
-		end = ws.cell(row=2+2*len(markers), column=percent_host_col)
+		percent_host_avg = ws.cell(row=raa + 2*len(markers), column=percent_host_col)
+		start = ws.cell(row=raa, column=percent_host_col)
+		end = ws.cell(row=raa - 1 + 2*len(markers), column=percent_host_col)
 		percent_host_avg.value = '=AVERAGE({}:{})'.format(start.coordinate, end.coordinate)
 
-		percent_donor_avg = ws.cell(row=4+2*len(markers), column=percent_host_col)
+		percent_donor_avg = ws.cell(row=raa + 1 + 2*len(markers), column=percent_host_col)
 		percent_donor_avg.value = '=100-{}'.format(percent_host_avg.coordinate)
-
-
-	if file_path is not None:
-		if file_path.endswith('.xlsx'):
-			'''	Save the file before running fix_formatting '''
-			wb.save(file_path)
-			wb.close()
-
-			'''	Fix formatting '''
-			fix_formatting(file_path)
-			print('Done saving {}'.format(file_path))
-
-	wb.close()
 
 	return wb
 
@@ -447,23 +458,6 @@ def make_template_from_existing_template(template):
 		THIS IS THE OTHER PLACE TO EDIT FOR 2+ DONORS
 		*********************************************
 	'''
-
-	''' Helper function '''
-	def string_to_number(s):
-		try:
-			s = float(s)
-		except:
-			pass
-		return s
-
-	''' Helper function '''
-	def format_value(cell_value):
-		if cell_value is not None:
-			cell_value_formatted = str(cell_value).replace('.0', '')
-		else:
-			cell_value_formatted = None
-		return cell_value_formatted
-
 
 	results_dict, host_case, donor_case = make_results_dict_from_template(template)
 
