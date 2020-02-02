@@ -153,8 +153,6 @@ def organize_clonality_files(path):
 
 
 class Case(object):
-	"""	I'm sure there's a better way than making a dummy class like this.
-	"""
 
 	def __init__(self):
 		self.name = None
