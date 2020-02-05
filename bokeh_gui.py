@@ -212,7 +212,7 @@ def bkapp(curdoc):
 			# template_path = file_path
 			# df = fill_template_with_areas_2(template=global_dict['template_path'])
 			# makeshift_results_dictionary(template=global_dict['template_path'])
-			wb = make_template_from_existing_template(template=global_dict['template_path'])
+			wb = load_template_and_fix(template=global_dict['template_path'])
 			patient_name = get_patient_name_from_header(global_dict['template_path'])
 			# print('patient_name = {}'.format(patient_name))
 			if patient_name is None or patient_name == '':
