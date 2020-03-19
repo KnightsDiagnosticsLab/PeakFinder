@@ -16,5 +16,5 @@
 *.pyc
 *.pyc
 *.pyc
-dist/*
-build/*
+dist/
+build/

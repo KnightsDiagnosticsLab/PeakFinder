@@ -558,7 +558,9 @@ def load_template_and_fix(template):
 	'''	Add the actual formulae. For now only if there's one donor, because
 		I haven't been given a cheatsheet for 2+ donors.
 	'''
-	# wb = insert_equations(wb=wb, file_path=file_path, host_case=host_case, donor_cases=donor_cases, df_cases=df_cases, host_name=host_name)
+	wb = insert_equations(wb=wb, host_case=host_case, donor_cases=donor_cases)
+
+	ws = wb.active
 
 	# df = pd.DataFrame(ws.values)
 	# print(df)
