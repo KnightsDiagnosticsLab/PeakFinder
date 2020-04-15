@@ -61,13 +61,38 @@ def bkapp(curdoc):
 	def p0c0_on_donor_change(attrname, old, new):
 		# global p0c1_allele_table
 
-		newest = [c for c in new if c not in old]
-		if len(newest) > 0:
-			global_dict['p0_current_case'] = newest[0]
+		# print('p0c1_allele_table -> new = {}'.format(new))
+		global_dict['p0_donors'] = new[:]
 
-			p0c1_table_title.text = str(global_dict['p0_current_case'])
-			p0c1_allele_table.source.data = source_cases[newest[0]].data
-			p0c1_allele_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+
+		tab_list = [host_tab]
+		for i, donor in enumerate(new):
+			donor_allele_table = DataTable(columns=columns, source=source_cases[donor], selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300)
+			donor_allele_table.source.data = source_cases[donor].data
+			donor_allele_table.source.selected.indices = source_cases[donor].selected.indices[:]
+	
+			tab_list.append(Panel(child=donor_allele_table, title='Donor ' + str(i+1) + ' Alleles'))
+		
+		p0c1_tabs.tabs = tab_list
+
+		# newest = [c for c in new if c not in old]
+
+
+		# if len(newest) > 0:
+		# 	global_dict['p0_current_case'] = newest[0]
+
+		# 	# p0c1_table_title.text = str(global_dict['p0_current_case'])
+		# 	# p0c1_allele_table.source.data = source_cases[newest[0]].data
+		# 	# p0c1_allele_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+
+		# 	donor_allele_table = DataTable(columns=columns, source=source_cases[newest[0]], selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300)
+		# 	donor_allele_table.source.data = source_cases[newest[0]].data
+		# 	donor_allele_table.source.selected.indices = source_cases[newest[0]].selected.indices[:]
+	
+		# 	donor_tab = Panel(child=donor_allele_table, title='Donor Alleles')
+		# 	p0c1_tabs.tabs.append(donor_tab)
+
+
 		refresh_p0_template_preview_table()
 
 
@@ -96,10 +121,12 @@ def bkapp(curdoc):
 	def p0c0_on_host_click(attrname, old, new):
 		# global source_cases, p0c1_allele_table
 
-		global_dict['p0_current_case'] = new
-		p0c1_table_title.text = str(global_dict['p0_current_case'])
-		p0c1_allele_table.source.data = source_cases[new].data
-		p0c1_allele_table.source.selected.indices = source_cases[new].selected.indices[:]
+		global_dict['p0_host'] = new
+		# print('p0c0_on_host_click -> new = {}'.format(new))
+		# global_dict['p0_current_case'] = new
+		# p0c1_table_title.text = str(global_dict['p0_current_case'])
+		p0c1_host_allele_table.source.data = source_cases[new].data
+		p0c1_host_allele_table.source.selected.indices = source_cases[new].selected.indices[:]
 
 
 	def pNc0_on_results_click():
@@ -133,7 +160,7 @@ def bkapp(curdoc):
 					indices = pre_selected_indices(df_copy)
 					df_copy.loc[indices,'Selected'] = True
 					df_cases[case] = df_copy
-					# print(df_copy)
+					# print('pNc0_on_results_click -> df_copy = {}'.format(df_copy))
 					source_cases[case] = ColumnDataSource(df_copy)
 					source_cases[case].selected.indices = indices
 
@@ -179,11 +206,25 @@ def bkapp(curdoc):
 	def p0c1_on_select_alleles_change(attrname, old, new):
 		# global df_cases
 
+		'''	[ ] need to make index updating handle multiple cases in one table
+		'''
 		indices = p0c1_allele_table.source.selected.indices[:]
 		source_cases[global_dict['p0_current_case']].selected.indices = indices[:]
 		df_cases[global_dict['p0_current_case']].loc[:,'Selected'] = False
 		df_cases[global_dict['p0_current_case']].loc[indices,'Selected'] = True
 		refresh_p0_template_preview_table()
+
+	def p0c1_on_select_host_alleles_change(attrname, old, new):
+		# global df_cases
+
+		'''	[ ] need to make index updating handle multiple cases in one table
+		'''
+		indices = p0c1_host_allele_table.source.selected.indices[:]
+		source_cases[global_dict['p0_host']].selected.indices = indices[:]
+		df_cases[global_dict['p0_host']].loc[:,'Selected'] = False
+		df_cases[global_dict['p0_host']].loc[indices,'Selected'] = True
+		refresh_p0_template_preview_table()
+
 
 
 	def p1c0_on_select_template_click():
@@ -212,7 +253,7 @@ def bkapp(curdoc):
 			# template_path = file_path
 			# df = fill_template_with_areas_2(template=global_dict['template_path'])
 			# makeshift_results_dictionary(template=global_dict['template_path'])
-			wb = make_template_from_existing_template(template=global_dict['template_path'])
+			wb = load_template_and_fix(template=global_dict['template_path'])
 			patient_name = get_patient_name_from_header(global_dict['template_path'])
 			# print('patient_name = {}'.format(patient_name))
 			if patient_name is None or patient_name == '':
@@ -387,6 +428,7 @@ def bkapp(curdoc):
 
 
 	columns = [#TableColumn(field='Sample File Name', title='Sample File Name', width=300),
+				# TableColumn(field='Sample File Name', title='Host/Donor', width=75),
 				TableColumn(field='Marker', title='Marker', width=75),
 				TableColumn(field='Allele', title='Allele', width=50),
 				TableColumn(field='Area', title='Area', width=50)]
@@ -394,6 +436,11 @@ def bkapp(curdoc):
 
 	source = ColumnDataSource()
 	source.selected.on_change('indices', p0c1_on_select_alleles_change)
+
+	source_host = ColumnDataSource()
+	source_host.selected.on_change('indices', p0c1_on_select_host_alleles_change)
+
+
 
 	p0c1_allele_table = DataTable(columns=columns, source=source, selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300)
 	p0c2_template_table = DataTable(source=ColumnDataSource(), fit_columns=True, sizing_mode='stretch_both')
@@ -410,7 +457,20 @@ def bkapp(curdoc):
 					p0c0_export_template,
 					sizing_mode='fixed')
 
-	p0c1 = column(p0c1_table_title, p0c1_allele_table, sizing_mode='stretch_height')
+
+	p0c1_host_allele_table = DataTable(columns=columns, source=source_host, selectable='checkbox', fit_columns=True, sizing_mode='stretch_height', width=300)
+
+	# host_tab = Panel(child=row(p0c1_host_allele_table, sizing_mode='stretch_height'),
+	# 					title='Host Alleles')
+	host_tab = Panel(child=p0c1_host_allele_table, title='Host Alleles')
+
+	# p0c1_tabs = Tabs(tabs=[host_tab, donor_tab])
+	p0c1_tabs = Tabs(tabs=[host_tab])
+
+	p0c1 = column(	# p0c1_table_title,
+					# p0c1_allele_table,
+					p0c1_tabs,
+					sizing_mode='stretch_height')
 
 	p0c2 = column(p0c2_table_title, p0c2_template_table, sizing_mode='stretch_both')
 	# p0c2 = column(p0c2_template_table)
@@ -427,12 +487,13 @@ def bkapp(curdoc):
 
 	p1c2 = column(p1c2_table_title, p1c2_template_table, sizing_mode='scale_height')
 
-	child_0 = row(p0c0, p0c1, p0c2, sizing_mode='stretch_both')
-	# child_0 = row(p0c0, p0c1, p0c2)
-	child_1 = row(p1c0, p1c1, p1c2, sizing_mode='stretch_height')
-	tab1 = Panel(child=child_0, title='Make Template')
-	tab2 = Panel(child=child_1, title='Populate Results')
-	tabs = Tabs(tabs=[tab1, tab2])
+	panel_0 = Panel(child=row(p0c0, p0c1, p0c2, sizing_mode='stretch_both'),
+					title='Make Template')
+	panel_1 = Panel(child=row(p1c0, p1c1, p1c2, sizing_mode='stretch_height'),
+					title='Populate Results')
+
+
+	tabs = Tabs(tabs=[panel_0, panel_1])
 	curdoc.add_root(tabs)
 	curdoc.title = 'PTE'
 
@@ -448,3 +509,10 @@ if __name__ == '__main__':
 
 	server.io_loop.add_callback(server.show, "/")
 	server.io_loop.start()
+
+
+'''	[X] make alleles show up as options. See PTE20-22A host 360M8, donor 16M16, D8S1179 11 12 12 14
+		[X] Tabs for allele table
+	[ ] Left justify bottom left region of template/output xlsx files
+		[ ] Prevent 'None' from populating cells
+'''
