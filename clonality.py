@@ -796,31 +796,43 @@ def replicate_peaks(case):
 
 def main():
 	owd = os.getcwd()  # original working directory
-	# path = os.path.abspath(sys.argv[1])
-	path = easygui.diropenbox()
-	os.chdir(path)
-	convert_folder(path)
-	cases = organize_clonality_files(path)
-	# output_path = os.path.join(path, '/plots')
-	# if not os.path.exists(output_path): os.mkdir(output_path)
-	for case_name in sorted(cases.keys()):
-		try:
-			case = cases[case_name]
-			print('Processing {}'.format(case_name))
-			case = gather_case_data(case, case_name, path)
-			case = size_standard(case, ch_ss_num=4)
-			case = find_artifactual_peaks(case)
-			# case = baseline_correction_simple(case)
-			case = baseline_correction_advanced(
-				case, ch_list=channels_of_interest.keys(), distance=10)
-			# case = pick_peak_one(case)
-			# case = make_decay_curve(case)
-			case = local_southern(case)
-			case = index_of_peaks_to_annotate(case)
-			case = replicate_peaks(case)
-			plot_clonality_case(case, replicate_only=False, w=1050, h=350)
-		except:
-			 print('Failed on {}'.format(case_name))
+	while True:
+		# os.chdir(owd)
+		path = easygui.diropenbox(default='X:\Hospital\Genetics Lab\DNA_Lab\Ghani\Clonality\\')
+		if path is None:
+			exit()
+		print('Now working on {}'.format(path))
+		os.chdir(path)
+		convert_folder(path)
+		cases = organize_clonality_files(path)
+		# output_path = os.path.join(path, '/plots')
+		# if not os.path.exists(output_path): os.mkdir(output_path)
+		for case_name in sorted(cases.keys()):
+			try:
+				case = cases[case_name]
+				print('Processing {}'.format(case_name))
+				case = gather_case_data(case, case_name, path)
+				case = size_standard(case, ch_ss_num=4)
+				case = find_artifactual_peaks(case)
+				# case = baseline_correction_simple(case)
+				case = baseline_correction_advanced(
+					case,
+					ch_list=channels_of_interest.keys(),
+					distance=10
+				)
+				# case = pick_peak_one(case)
+				# case = make_decay_curve(case)
+				case = local_southern(case)
+				case = index_of_peaks_to_annotate(case)
+				case = replicate_peaks(case)
+				plot_clonality_case(
+					case,
+					replicate_only=False,
+					w=1050,
+					h=350
+				)
+			except:
+				print('Failed on {}'.format(case_name))
 
 if __name__ == '__main__':
 	main()
